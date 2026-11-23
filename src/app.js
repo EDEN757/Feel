@@ -1,5 +1,8 @@
+import { diffWords } from "./diff.js";
+import "./landing.js";
 import { documents } from "./documents.js";
 import { SAMPLE } from "./sample.js";
+import { createSound } from "./sound.js";
 import { isLive, request as api, settings } from "./llm/index.js";
 
 const NAMES = { edit: ["", "slight", "medium", "strong"], write: ["", "phrase", "sentence", "paragraph"] };
@@ -19,7 +22,12 @@ const refsEl = $("refs"), meterEl = $("meter");
 
 let W = 0, H = 0, RX = 0, RY = 0, CX = 0, CY = 0;
 const TEXT_STORAGE = "feeling-text";
-let text = stored();
+/** Inside the front page's tour the app runs on the sample letter and the simulator, and leaves the saved text alone. */
+const DEMO = new URLSearchParams(location.search).has("demo");
+const DEMO_TEXT = SAMPLE.split("\n\n").slice(1, 3).join("\n\n");
+if (DEMO) { settings.simulate = true; document.body.classList.add("demo"); }
+let text = DEMO ? DEMO_TEXT : stored();
+const undone = { past: [], future: [] };
 let seg = null;
 let changes = 0;
 let mouse = { x: -1, y: -1 };
@@ -68,9 +76,31 @@ function stored() {
   try { return localStorage.getItem(TEXT_STORAGE) ?? ""; } catch { return ""; }
 }
 
+/** Changes the text, keeping the old one for undo. */
+function setText(next) {
+  if (next === text) return;
+  undone.past.push(text);
+  undone.future = [];
+  text = next;
+}
+
+function undo(back) {
+  const [from, to] = back ? [undone.past, undone.future] : [undone.future, undone.past];
+  if (!from.length) return toast(back ? "nothing to undo" : "nothing to redo");
+  if (seg) { clearTimeout(seg.fadeTimer); seg = null; }
+  to.push(text);
+  text = from.pop();
+  render();
+}
+
+/** Tells the front page what just happened, so its tour can tick the step off. */
+function notify(step) {
+  if (DEMO) parent.postMessage({ feeling: step }, location.origin);
+}
+
 /** Keeps the text for the next visit. A passage still being shaped is not part of it until it is saved. */
 function remember() {
-  if (remember.last === text) return;
+  if (DEMO || remember.last === text) return;
   remember.last = text;
   try { text ? localStorage.setItem(TEXT_STORAGE, text) : localStorage.removeItem(TEXT_STORAGE); } catch {}
 }
@@ -84,6 +114,7 @@ function render() {
   const set = currentSet();
   if (!seg || seg.done) hintEl.innerHTML = "<b>select</b> words to reshape them  ·  <b>click</b> between words to write there  ·  scroll to read";
   else if (!set) hintEl.textContent = seg.mode === "write" ? "thinking about what could go here…" : "reading the passage…";
+  else if (DEMO) hintEl.innerHTML = "<b>move</b> toward a meaning · <b>click</b> to pin · <b>↵</b> save · <b>type</b> to ask · <b>←</b> shorter · <b>esc</b> cancel";
   else {
     const what = seg.mode === "write" ? "a move, further out writes more" : "a meaning, nearer the edge is stronger";
     const pins = seg.pins.length ? ` (${seg.pins.length} pinned)` : "";
@@ -167,6 +198,11 @@ function open(fields) {
   seg = { ...fields, current: fields.original, preview: null, sets: [], setIndex: 0, pins: [], history: [] };
   openT = 0;
   sound.wake();
+  notify(seg.mode === "write" ? "write" : "select");
+  if (!isLive() && !DEMO && !SAMPLE.includes(text.slice(0, 60)) && !open.warned) {
+    open.warned = true;
+    toast("simulator: it only knows the sample letter, so changes here are rough. Add a key for a real model.");
+  }
   if (seg.mode === "edit") ahead(ladderOf(seg).versions);
   render();
   centerOn(textEl.querySelector(".seg, .ghost"));
@@ -198,7 +234,7 @@ function snapToWords(str, s, t) {
 function forget() {
   if (!seg) return;
   clearTimeout(seg.fadeTimer);
-  if (seg.done) text = text.slice(0, seg.start) + seg.current + text.slice(seg.end);
+  if (seg.done) setText(text.slice(0, seg.start) + seg.current + text.slice(seg.end));
   seg = null;
 }
 
@@ -350,6 +386,7 @@ async function askFor(query, apply = true) {
     const asked = { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, refs: refsOf(target.pins), count: MEANINGS, apply };
     const { text: result, directions } = await api("prompt", asked);
     if (seg !== target) return;
+    notify("ask");
     if (!apply) {
       target.sets.push(directions.map((d) => ({ ...d, kind: d.kept ? "kept" : "suggested", basis: basisOf(target) })));
       target.setIndex = target.sets.length - 1;
@@ -471,6 +508,7 @@ addEventListener("mousedown", (e) => {
       get y() { return ellipsePoint(this.q, this.deg)[1]; } });
     planted.push({ x: e.clientX, y: e.clientY, born: performance.now(), level: a.level });
     sound.plant(a.level);
+    notify("pin");
   }
   render();
   refreshPreview();
@@ -482,6 +520,7 @@ async function save() {
   if (!pulls.length && !target.prompt) return toast(target.mode === "write" ? "pin a move, point at one, or type what you want" : "pin a meaning, point at one, or type what you want");
   collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: target.pins.map((p) => ({ x: p.x, y: p.y })) };
   sound.save(pulls.length);
+  notify("save");
   target.preview = null;
   const instant = !pulls.length || (pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner && pulls[0].dir.basis === basisOf(target));
   if (!instant) { target.waiting = true; finish(target, false); }
@@ -552,6 +591,7 @@ async function runShrink() {
       target.history.push({ text: before, rung: ladder.rung });
       ladder.rung = rung;
       await shatter(target, before, shorter);
+      notify("shorter");
     }
   } catch (error) { toast(error.message); }
   shrinkState.busy = false;
@@ -572,7 +612,7 @@ async function shatter(target, before, after) {
   const boxes = [...textEl.querySelectorAll(".doomed")].flatMap((el) => [...el.getClientRects()]);
   for (const r of boxes) burst(r);
   sound.shatter(boxes.length);
-  text = text.slice(0, target.start) + after + text.slice(target.end);
+  setText(text.slice(0, target.start) + after + text.slice(target.end));
   target.end = target.start + after.length;
   target.doomedFrom = null;
   target.bornFrom = before;
@@ -599,7 +639,7 @@ function grow() {
   if (!entry) return toast("nothing to bring back");
   const previous = entry.text;
   if (target.ladder) target.ladder.rung = entry.rung;
-  text = text.slice(0, target.start) + previous + text.slice(target.end);
+  setText(text.slice(0, target.start) + previous + text.slice(target.end));
   target.end = target.start + previous.length;
   const before = target.original;
   target.original = target.current = previous;
@@ -697,7 +737,7 @@ function setEditing(on) {
     editor.value = text;
     editor.focus();
   } else {
-    text = editor.value.trim();
+    setText(editor.value.trim());
     changes = 0;
     render();
   }
@@ -705,7 +745,16 @@ function setEditing(on) {
 
 $("edit").addEventListener("click", () => setEditing(!document.body.classList.contains("editing")));
 $("startOwn").addEventListener("click", () => setEditing(true));
-$("startSample").addEventListener("click", () => { text = SAMPLE; render(); });
+$("startSample").addEventListener("click", () => { setText(SAMPLE); render(); scrollTo(0, 0); });
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(text); toast("copied"); } catch { toast("could not copy: select the text and copy it by hand"); }
+});
+
+addEventListener("keydown", (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z" || e.target.closest?.("input, textarea") || isOpen()) return;
+  e.preventDefault();
+  undo(!e.shiftKey);
+});
 const keyDialog = $("keyDialog");
 $("live").addEventListener("click", () => {
   $("keyInput").value = settings.apiKey;
@@ -1010,76 +1059,5 @@ function drawParticles() {
 }
 
 function easeOut(x) { return 1 - (1 - Math.min(1, Math.max(0, x))) ** 3; }
-
-function createSound() {
-  let ac = null, out = null, muted = false;
-  try { muted = localStorage.getItem("feeling-sound") === "off"; } catch {}
-  function ready() {
-    if (muted) return false;
-    if (!ac) { ac = new AudioContext(); out = ac.createGain(); out.gain.value = 0.7; out.connect(ac.destination); }
-    ac.resume();
-    return true;
-  }
-  function blip(freq, peak, length, delay = 0, type = "sine", slide = 0) {
-    if (!ac || !ready()) return;
-    const osc = ac.createOscillator(), gain = ac.createGain(), at = ac.currentTime + delay;
-    osc.type = type; osc.frequency.setValueAtTime(freq, at);
-    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), at + length);
-    gain.gain.setValueAtTime(0, at); gain.gain.linearRampToValueAtTime(peak, at + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
-    osc.connect(gain).connect(out); osc.start(at); osc.stop(at + length + 0.05);
-  }
-  function noise(peak, length, cutoff) {
-    if (!ac || !ready()) return;
-    const buffer = ac.createBuffer(1, Math.ceil(ac.sampleRate * length), ac.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 2;
-    const src = ac.createBufferSource(), filter = ac.createBiquadFilter(), gain = ac.createGain();
-    src.buffer = buffer; filter.type = "bandpass"; filter.frequency.value = cutoff; filter.Q.value = 0.8; gain.gain.value = peak;
-    src.connect(filter).connect(gain).connect(out); src.start();
-  }
-  const scale = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
-  return {
-    get muted() { return muted; },
-    wake: () => ready(),
-    meaning: (i) => blip(scale[i % scale.length], 0.03, 0.4),
-    tick: (level) => blip(440 * 2 ** ((level * 4) / 12), 0.04, 0.07, 0, "triangle"),
-    swap: () => { blip(880, 0.02, 0.06); blip(1174.66, 0.02, 0.08, 0.05); },
-    plant: (level) => { blip(level ? 196 : 147, 0.08, 0.5); if (level) blip(392 * 2 ** (level / 12), 0.035, 0.9, 0.06); },
-    unpin: () => blip(147, 0.05, 0.25, 0, "triangle"),
-    save: (count) => { [523.25, 659.25, 783.99, 1046.5].slice(0, Math.min(4, count + 1)).forEach((f, i) => blip(f, 0.035, 0.9, i * 0.07)); },
-    charge: (combo) => blip(300 + combo * 90, 0.04, 0.06, 0, "square"),
-    crack: () => blip(1600, 0.03, 0.05, 0, "square"),
-    shatter: (pieces) => { noise(0.25, 0.35, 2200); noise(0.15, 0.5, 700); blip(220, 0.06, 0.4, 0, "sawtooth", 0.3); },
-    grow: () => blip(330, 0.04, 0.35, 0, "sine", 2),
-    toggle() { muted = !muted; try { localStorage.setItem("feeling-sound", muted ? "off" : "on"); } catch {} },
-  };
-}
-
-/** Word-level diff. With `removed`, marks the words of `a` that are gone in `b`; otherwise the words of `b` that are new. */
-function diffWords(a, b, removed = false) {
-  const A = a.split(/(\s+)/), B = b.split(/(\s+)/);
-  const n = A.length, m = B.length;
-  const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
-  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
-  const out = [];
-  let i = 0, j = 0;
-  if (removed) {
-    while (i < n) {
-      if (j < m && A[i] === B[j]) { out.push({ text: A[i], changed: false }); i++; j++; }
-      else if (j < m && L[i][j + 1] > L[i + 1][j]) j++;
-      else { out.push({ text: A[i], changed: /\S/.test(A[i]) }); i++; }
-    }
-  } else {
-    while (j < m) {
-      if (i < n && A[i] === B[j]) { out.push({ text: B[j], changed: false }); i++; j++; }
-      else if (i < n && L[i + 1][j] >= L[i][j + 1]) i++;
-      else { out.push({ text: B[j], changed: /\S/.test(B[j]) }); j++; }
-    }
-  }
-  out.forEach((part, k) => {
-    if (!/\S/.test(part.text) && out[k - 1]?.changed && out[k + 1]?.changed) part.changed = true;
-  });
-  return out;
-}
 
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }

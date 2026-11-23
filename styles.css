@@ -4,7 +4,7 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); }
 body { font: 400 16px/1.9 var(--mono); -webkit-font-smoothing: antialiased; }
 body.open { cursor: none; }
 button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; z-index: 4; }
+#screen { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; z-index: 4; }
 
 #top { position: fixed; top: 0; left: 0; right: 0; padding: 18px 24px 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mid); z-index: 3; transition: opacity .3s; background: linear-gradient(#000 60%, transparent); }
 #top b { color: var(--fg); font-weight: 500; }
@@ -90,14 +90,36 @@ dialog menu button:hover, dialog menu button[value="save"] { color: var(--fg); }
 #docForm textarea { min-height: 140px; resize: vertical; }
 #docForm menu { display: flex; justify-content: flex-end; gap: 18px; margin: 0; padding: 0; }
 
-#start { position: fixed; inset: 0; display: none; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; z-index: 2; }
-body.empty:not(.editing) #start { display: grid; }
-body.empty #text, body.empty #hint, body.empty:not(.editing) #edit { display: none; }
-#start h1 { font: 500 16px var(--mono); margin: 0; }
-#start p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
-#start menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 28px; margin: 18px 0 0; padding: 0; }
-#start button { border-bottom: 1px solid var(--mid); padding: 2px 0; }
-#start button:hover { border-bottom-color: var(--fg); }
-#start footer { position: fixed; bottom: 22px; left: 0; right: 0; font-size: 12px; color: #666; }
-#start footer a { color: var(--mid); text-decoration: none; border-bottom: 1px solid #444; }
-#start footer a:hover { color: var(--fg); border-bottom-color: var(--fg); }
+#start { display: none; position: relative; z-index: 2; }
+body.empty:not(.editing) #start { display: block; }
+body.empty #text, body.empty #hint, body.empty:not(.editing) #edit, body.empty #copy { display: none; }
+
+#hero { position: relative; min-height: 88vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
+#hero h1 { font: 500 16px var(--mono); margin: 0; }
+#hero p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
+#hero menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 28px; margin: 18px 0 0; padding: 0; }
+#hero menu button { border-bottom: 1px solid var(--mid); padding: 2px 0; }
+#hero menu button:hover { border-bottom-color: var(--fg); }
+#scrollCue { position: absolute; bottom: 74px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--mid); text-decoration: none; white-space: nowrap; }
+#scrollCue:hover { color: var(--fg); }
+#scrollCue span { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
+@keyframes nudge { 50% { transform: translateY(5px); } }
+#hero footer { position: absolute; bottom: 14px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+#dotName { display: block; line-height: 0; }
+#repoLink { color: var(--mid); text-decoration: none; }
+#repoLink:hover { color: var(--fg); }
+
+#tour { padding: 0 max(24px, 5vw) 12vh; display: grid; justify-items: center; gap: 18px; }
+#tour h2 { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mid); margin: 0; }
+#steps { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 26px; margin: 0; padding: 0; font-size: 12px; color: var(--mid); }
+#steps b { color: var(--fg); font-weight: 500; }
+#steps li::before { content: "□ "; }
+#steps li.done { color: #555; }
+#steps li.done::before { content: "■ "; color: var(--fg); }
+#steps li.done b { color: var(--mid); }
+#demo { width: min(1180px, 100%); height: min(760px, 86vh); border: 1px solid #2a2a2a; background: var(--bg); }
+#tour .note { margin: 0; font-size: 12px; color: #666; text-align: center; }
+
+body.demo #top, body.demo #refsTab { display: none; }
+html:has(body.demo) { overflow: hidden; }
+body.demo #text { padding: 17vh 0 0; }

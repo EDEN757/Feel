@@ -12,6 +12,8 @@ npm start
 
 Then open http://localhost:4317. There is nothing to install and no backend: `npm start` only serves the files, and any static host works.
 
+The front page has a tour: the app itself, running on sample text, with a checklist that ticks as you try things.
+
 Out of the box it runs on a **simulator** with canned rewrites, which is enough to try the interaction on the sample letter. To use a real model, click **simulator · add key** and paste your own [Cerebras](https://cloud.cerebras.ai) API key. The key is stored only in your browser and sent only to `api.cerebras.ai`.
 
 ## How it works
@@ -26,6 +28,7 @@ Out of the box it runs on a **simulator** with canned rewrites, which is enough 
 | Push the right edge | Opens your documents. Click a passage to reference it. |
 | ← ↓ / → ↑ | Shorter, or back. Tap fast to cut more. Only while nothing is typed. |
 | Enter / Esc | Save, or cancel. |
+| Cmd+Z / Shift+Cmd+Z | Undo or redo a saved change. |
 
 ### Why it feels fast
 
@@ -35,7 +38,10 @@ The interface asks ahead of need, in the way [Spaceship](https://github.com/chua
 
 ```
 index.html, styles.css   the page
-src/app.js               the ring: selection, aiming, pins, drawing, sound
+src/app.js               the ring: selection, aiming, pins, drawing
+src/landing.js           the front page: the name in dots, the tour's checklist
+src/documents.js         your reference documents, kept in the browser
+src/diff.js, sound.js    word-level diff; synthesized sounds
 src/sample.js            the sample letter and placeholder documents
 src/llm/index.js         one door to the model: cache, queue, key storage
 src/llm/prompts.js       what the model is asked, per request kind
@@ -43,11 +49,12 @@ src/llm/cerebras.js      the Cerebras client
 src/llm/simulator.js     canned replies for running without a key
 explorations/            earlier sketches of the interaction (simulator only)
 scripts/serve.mjs        static server for local development
+tests/                   run with `npm test`
 ```
 
 ## Status
 
-A prototype. Your text and documents are kept in your browser, but there is no undo across saved changes yet, and the prompts are still being tuned against real models.
+A prototype. Your text and documents are kept in your browser. The prompts are still being tuned against real models, and it expects a mouse, a keyboard and a wide window.
 
 ## Credits
 

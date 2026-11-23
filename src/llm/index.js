@@ -19,6 +19,8 @@ let running = 0
 
 /** The key and model live only in this browser's localStorage. */
 export const settings = {
+  /** Set to answer from the simulator even when a key is saved. */
+  simulate: false,
   get apiKey() { return read(KEY_STORAGE) },
   get model() { return read(MODEL_STORAGE) || DEFAULT_MODEL },
   save({ apiKey, model }) {
@@ -29,7 +31,7 @@ export const settings = {
 }
 
 export function isLive() {
-  return !!settings.apiKey
+  return !!settings.apiKey && !settings.simulate
 }
 
 export function request(kind, payload) {
