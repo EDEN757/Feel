@@ -1,106 +1,140 @@
 /**
- * The tour plays itself. A ghost cursor walks through each interaction by sending the same mouse and key events
- * a person would, so what is shown is the real interface. A real cursor passing over changes nothing; the first
- * press or key stops the show and hands over the controls. It starts over a few seconds after the visitor leaves.
+ * The clips on the front page. Each one is the real app in a small frame, with a ghost cursor walking through one
+ * interaction by sending the same mouse and key events a person would, then starting over. Nothing is recorded.
  */
 
 export const pilot = { running: false }
 
-const RESUME_AFTER_MS = 3500
+const FIRST = "I think I could help your company"
+const SECOND = "I learned to work with people from different fields"
+const LONG = "I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app."
+const STOPPED = Symbol("stopped")
+
+/** One interaction each. `it` is the set of gestures built in `startAutopilot`. */
+const CLIPS = {
+  async change(it) {
+    await it.select(FIRST)
+    for (const level of [1, 2, 3]) { await it.toRing(1, level, 650); await it.wait(800) }
+    await it.toRing(0, 2, 900)
+    await it.wait(900)
+    await it.toRing(4, 3, 1000)
+    await it.wait(1000)
+    it.press("Enter")
+    await it.wait(2600)
+  },
+
+  async combine(it) {
+    await it.select(FIRST)
+    await it.toRing(1, 2, 800)
+    await it.wait(300)
+    it.click()
+    await it.wait(700)
+    await it.toRing(4, 2, 1000)
+    await it.settled()
+    await it.wait(1100)
+    it.click()
+    await it.wait(300)
+    await it.toRing(4, 0, 600)
+    await it.wait(1200)
+    it.press("Enter")
+    await it.wait(2600)
+  },
+
+  async ask(it) {
+    await it.select(SECOND)
+    await it.type("connect it to my thesis")
+    await it.settled()
+    await it.wait(1500)
+    await it.toRing(2, 2, 900)
+    await it.wait(1300)
+    it.press("Enter")
+    await it.wait(2600)
+  },
+
+  async shorter(it) {
+    await it.select(LONG)
+    await it.wait(500)
+    for (let i = 0; i < 3; i++) { it.press("ArrowLeft"); await it.wait(1500) }
+    it.press("ArrowRight")
+    await it.wait(1400)
+    it.press("Escape")
+    await it.wait(1200)
+  },
+
+  async documents(it) {
+    await it.select(FIRST)
+    await it.moveTo(innerWidth - 4, innerHeight / 2, 900)
+    await it.wait(700)
+    const passage = document.querySelectorAll("#refs .doc p")[3].getBoundingClientRect()
+    await it.moveTo(passage.left + 60, passage.top + passage.height / 2, 700)
+    await it.wait(400)
+    it.click()
+    await it.wait(1200)
+    await it.toRing(1, 2, 1100)
+    await it.settled()
+    await it.wait(1600)
+    it.press("Enter")
+    await it.wait(2800)
+  },
+
+  async write(it) {
+    const sentence = "would be useful in the role."
+    const offset = it.app.text().indexOf(sentence) + sentence.length
+    const spot = it.app.rects(offset - 1, offset).at(-1)
+    await it.moveTo(spot.right + 2, spot.top + spot.height / 2, 900)
+    await it.wait(300)
+    it.app.writeAt(offset)
+    await it.settled()
+    await it.wait(400)
+    for (const level of [1, 2, 3]) { await it.toRing(0, level, 650); await it.wait(950) }
+    it.press("Enter")
+    await it.wait(3000)
+  },
+}
 
 /**
- * @param app what the show needs from the app:
- *   rects(start, end) the on-screen boxes of a stretch of text; select(start, end) and writeAt(offset) to open the ring;
- *   point(index, level) a spot on the ring; isOpen(), isBusy(), text(); reset() back to the untouched sample.
+ * Plays one clip on a loop while the front page says it is in view.
+ * @param app what a clip needs from the app: rects(start, end) the on-screen boxes of a stretch of text;
+ *   select(start, end) and writeAt(offset) to open the ring; point(index, level) a spot on the ring;
+ *   isOpen(), isBusy(), text(); reset() back to the untouched sample.
  */
-export function startAutopilot(app) {
+export function startAutopilot(app, name) {
+  const clip = CLIPS[name]
+  if (!clip) return
+  pilot.running = true
   const ghost = document.body.appendChild(Object.assign(document.createElement("div"), { id: "ghost" }))
-  const note = document.body.appendChild(Object.assign(document.createElement("div"), { id: "demoNote" }))
   const marks = document.body.appendChild(Object.assign(document.createElement("div"), { id: "ghostMarks" }))
   const at = { x: innerWidth / 2, y: innerHeight / 2 }
   let run = 0
-  let visible = false
-  let resume = null
 
   addEventListener("message", (event) => {
     if (event.origin !== location.origin || typeof event.data?.feelingPlay !== "boolean") return
-    visible = event.data.feelingPlay
-    if (visible && !pilot.running && !resume) play()
-    if (!visible) stop()
+    if (event.data.feelingPlay) play()
+    else run++
   })
-
-  /** While the show runs, the visitor's pointer must not steer it: movement and scrolling pass the app by. */
-  for (const type of ["mousemove", "wheel"]) {
-    addEventListener(type, (event) => {
-      if (event.isTrusted && pilot.running) event.stopImmediatePropagation()
-    }, true)
-  }
-  /** A press or a key is the visitor asking for the controls. That first one only takes over; it is not acted on. */
-  for (const type of ["mousedown", "keydown"]) {
-    addEventListener(type, (event) => {
-      if (!event.isTrusted) return
-      clearTimeout(resume)
-      resume = null
-      if (!pilot.running) return
-      if (type === "keydown" && (event.metaKey || event.ctrlKey || event.altKey)) return
-      event.stopImmediatePropagation()
-      event.preventDefault()
-      takeOver()
-    }, true)
-  }
-  document.documentElement.addEventListener("mouseleave", (event) => {
-    if (!event.isTrusted || pilot.running) return
-    clearTimeout(resume)
-    resume = setTimeout(() => { resume = null; if (visible) play() }, RESUME_AFTER_MS)
-  })
-
-  function takeOver() {
-    stop()
-    app.reset()
-    note.textContent = "your turn · it plays again when you leave"
-  }
-
-  function stop() {
-    run++
-    pilot.running = false
-    document.body.classList.remove("piloting")
-    ghost.classList.remove("show")
-    mark([])
-    say(null)
-  }
-
-  /** Paints a selection over the given boxes. Drawn by hand, because a frame without focus shows no real selection. */
-  function mark(boxes) {
-    marks.replaceChildren(...boxes.map((box) => {
-      const piece = document.createElement("i")
-      Object.assign(piece.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` })
-      return piece
-    }))
-  }
 
   async function play() {
     const mine = ++run
-    pilot.running = true
-    document.body.classList.add("piloting")
-    ghost.classList.add("show")
-    note.textContent = "playing by itself · click here to try it yourself"
     try {
       while (true) {
+        mark([])
         app.reset()
-        await show(mine)
+        await gestures(mine).wait(700)
+        await clip(gestures(mine))
       }
     } catch (error) {
       if (error !== STOPPED) throw error
     }
   }
 
-  /** One pass through every interaction. */
-  async function show(mine) {
+  function gestures(mine) {
     const alive = () => { if (mine !== run) throw STOPPED }
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)).then(alive)
+    const send = (type) => (document.elementFromPoint(at.x, at.y) ?? document.body).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: at.x, clientY: at.y, button: 0 }))
+    const press = (key, target = document.body) => target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }))
     const settled = async () => { while (!app.isOpen() || app.isBusy()) await wait(80) }
 
-    const moveTo = async (x, y, ms = 700) => {
+    async function moveTo(x, y, ms = 700) {
       const from = { ...at }, started = performance.now()
       while (true) {
         const t = Math.min(1, (performance.now() - started) / ms), eased = t * t * (3 - 2 * t)
@@ -112,12 +146,9 @@ export function startAutopilot(app) {
         await new Promise(requestAnimationFrame).then(alive)
       }
     }
-    const toRing = (index, level, ms) => moveTo(...app.point(index, level), ms)
-    const send = (type) => document.body.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: at.x, clientY: at.y, button: 0 }))
-    const press = (key, target = document.body) => target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }))
 
     /** Drags a selection across a phrase the way a hand would, then opens the ring on it. */
-    const select = async (phrase) => {
+    async function select(phrase) {
       const start = app.text().indexOf(phrase), end = start + phrase.length
       const boxes = app.rects(start, end), first = boxes[0], last = boxes.at(-1)
       await moveTo(first.left, first.top + first.height / 2, 800)
@@ -132,72 +163,28 @@ export function startAutopilot(app) {
       mark([])
       app.select(start, end)
       await settled()
+      await wait(400)
     }
 
-    say("select")
-    await wait(600)
-    await select("I think I could help your company")
-    await wait(500)
-    for (const level of [1, 2, 3]) { await toRing(1, level, 650); await wait(750) }
-    await toRing(0, 2, 900)
-    await wait(900)
+    /** Types into the ask bar letter by letter, then sends it. */
+    async function type(words) {
+      const ask = document.querySelector("#askInput")
+      for (const letter of words) { ask.value += letter; await wait(55) }
+      await wait(450)
+      press("Enter", ask)
+      ask.value = ""
+      await wait(500)
+    }
 
-    say("pin")
-    await toRing(1, 2, 800)
-    await wait(300)
-    send("mousedown")
-    await wait(700)
-    await toRing(4, 2, 1000)
-    await settled()
-    await wait(1100)
-    send("mousedown")
-    await wait(300)
-    await toRing(4, 0, 600)
-    await wait(900)
-
-    say("save")
-    await wait(400)
-    press("Enter")
-    await wait(2400)
-
-    say("ask")
-    await select("I learned to work with people from different fields")
-    const ask = document.querySelector("#askInput")
-    for (const letter of "connect it to my thesis") { ask.value += letter; await wait(55) }
-    await wait(400)
-    press("Enter", ask)
-    ask.value = ""
-    await wait(600)
-    await settled()
-    await wait(1800)
-    press("Enter")
-    await wait(2400)
-
-    say("shorter")
-    await select("I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app.")
-    await wait(500)
-    for (let i = 0; i < 2; i++) { press("ArrowLeft"); await wait(1500) }
-    press("Escape")
-    await wait(900)
-
-    say("write")
-    const sentence = "would be useful in the role."
-    const offset = app.text().indexOf(sentence) + sentence.length
-    const spot = app.rects(offset - 1, offset).at(-1)
-    await moveTo(spot.right + 2, spot.top + spot.height / 2, 900)
-    await wait(300)
-    app.writeAt(offset)
-    await settled()
-    await wait(400)
-    for (const level of [1, 2, 3]) { await toRing(0, level, 650); await wait(900) }
-    press("Enter")
-    await wait(3000)
-    say(null)
+    return { app, wait, press, settled, moveTo, select, type, click: () => send("mousedown"), toRing: (index, level, ms) => moveTo(...app.point(index, level), ms) }
   }
 
-  function say(step) {
-    parent.postMessage({ feelingNow: step }, location.origin)
+  /** Paints a selection over the given boxes. Drawn by hand, because a frame without focus shows no real selection. */
+  function mark(boxes) {
+    marks.replaceChildren(...boxes.map((box) => {
+      const piece = document.createElement("i")
+      Object.assign(piece.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` })
+      return piece
+    }))
   }
 }
-
-const STOPPED = Symbol("stopped")

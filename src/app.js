@@ -25,8 +25,11 @@ let W = 0, H = 0, RX = 0, RY = 0, CX = 0, CY = 0;
 const TEXT_STORAGE = "feeling-text";
 /** Inside the front page's tour the app runs on the sample letter and the simulator, and leaves the saved text alone. */
 const DEMO = new URLSearchParams(location.search).has("demo");
-const DEMO_TEXT = SAMPLE.split("\n\n").slice(1, 3).join("\n\n");
+/** A clip is the tour showing one interaction by itself, on just the paragraph it needs. */
+const CLIP = new URLSearchParams(location.search).get("clip");
+const DEMO_TEXT = CLIP ? SAMPLE.split("\n\n")[CLIP === "shorter" ? 2 : 1] : SAMPLE.split("\n\n").slice(1, 3).join("\n\n");
 if (DEMO) { settings.simulate = true; document.body.classList.add("demo"); }
+if (CLIP) { document.body.classList.add("clip"); document.body.dataset.clip = CLIP; }
 let text = DEMO ? DEMO_TEXT : stored();
 const undone = { past: [], future: [] };
 /** The front page shows when there is no text yet, or when the name in the corner is clicked. */
@@ -821,7 +824,7 @@ function renderPanel() {
 
 /* ---------- the tour ---------- */
 
-if (DEMO) {
+if (CLIP) {
   startAutopilot({
     text: () => text,
     isOpen,
@@ -852,7 +855,7 @@ if (DEMO) {
       sound.silence(pilot.running);
       render();
     },
-  });
+  }, CLIP);
 }
 
 /* ---------- your documents ---------- */

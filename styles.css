@@ -128,14 +128,26 @@ body.demo #text { padding: 11vh 0 0; }
 #top #home { color: var(--fg); margin-left: 0; }
 #home:hover { text-decoration: underline; text-underline-offset: 4px; }
 #hero menu button[hidden] { display: none; }
-#hero h1 { line-height: 0; margin-bottom: 6px; }
-#steps li.now { color: var(--fg); }
-#steps li.now::before { content: "▸ "; color: var(--fg); }
+#hero h1 { position: relative; line-height: 0; margin: 0 0 6px; }
+#hero h1 canvas { position: absolute; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 1; }
 #ghost { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border: 1.5px solid var(--fg); border-radius: 50%; z-index: 7; pointer-events: none; display: none; }
 #ghost.show { display: block; }
-#demoNote { position: fixed; top: 16px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--mid); z-index: 6; pointer-events: none; }
-body.open #demoNote { opacity: .55; }
 #ghostMarks i { position: fixed; background: var(--fg); mix-blend-mode: difference; z-index: 3; pointer-events: none; }
-body.piloting, body.piloting.open { cursor: default; }
 body.demo { font-size: 15px; }
 #repoLink { display: block; line-height: 0; }
+
+#clips { padding: 0 max(24px, 5vw) 14vh; display: grid; justify-items: center; gap: 22px; }
+#clips h2 { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mid); margin: 0; }
+#clips .grid { width: min(1180px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: 34px 28px; }
+#clips figure { margin: 0; }
+.clip { aspect-ratio: 840 / 500; overflow: hidden; border: 1px solid #2a2a2a; background: var(--bg); }
+.clip iframe { border: 0; transform-origin: 0 0; pointer-events: none; display: block; }
+#clips figcaption { margin-top: 10px; font-size: 12px; color: var(--mid); }
+#clips figcaption b { color: var(--fg); font-weight: 500; margin-right: 1ch; }
+#demo { border: 1px solid #2a2a2a; }
+
+body.clip { font-size: 17px; }
+body.clip #hint { display: none; }
+body.clip #text { padding: 138px 0 0; }
+body.clip[data-clip="shorter"] #text { padding-top: 108px; }
+body.clip:not([data-clip="ask"]) #ask { display: none !important; }

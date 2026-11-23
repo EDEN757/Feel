@@ -26,7 +26,7 @@
 
 <section id="start">
   <div id="hero">
-    <h1 aria-label="feel"><canvas data-word="feel" data-cell="7"></canvas></h1>
+    <h1 aria-label="feel"><canvas data-word="feel" data-cell="7" data-fall></canvas></h1>
     <p>A new way to write with AI: move toward what you mean, and see the words change as you go.</p>
     <menu>
       <button id="startOwn">paste your own text</button>
@@ -41,8 +41,38 @@
     </footer>
   </div>
 
+  <div id="clips">
+    <h2>what you can do</h2>
+    <div class="grid">
+      <figure>
+        <div class="clip"><iframe data-frame="?demo&amp;clip=change" title="Clip: change the feeling" tabindex="-1" aria-hidden="true"></iframe></div>
+        <figcaption><b>change the feeling</b> select words, then move toward a meaning</figcaption>
+      </figure>
+      <figure>
+        <div class="clip"><iframe data-frame="?demo&amp;clip=combine" title="Clip: combine" tabindex="-1" aria-hidden="true"></iframe></div>
+        <figcaption><b>combine</b> click to pin, then add another</figcaption>
+      </figure>
+      <figure>
+        <div class="clip"><iframe data-frame="?demo&amp;clip=ask" title="Clip: ask in your words" tabindex="-1" aria-hidden="true"></iframe></div>
+        <figcaption><b>ask in your words</b> type what you want, then steer it</figcaption>
+      </figure>
+      <figure>
+        <div class="clip"><iframe data-frame="?demo&amp;clip=shorter" title="Clip: make it shorter" tabindex="-1" aria-hidden="true"></iframe></div>
+        <figcaption><b>make it shorter</b> tap ← and the extra words break off</figcaption>
+      </figure>
+      <figure>
+        <div class="clip"><iframe data-frame="?demo&amp;clip=documents" title="Clip: use your documents" tabindex="-1" aria-hidden="true"></iframe></div>
+        <figcaption><b>use your documents</b> push the right edge, click a passage</figcaption>
+      </figure>
+      <figure>
+        <div class="clip"><iframe data-frame="?demo&amp;clip=write" title="Clip: write something new" tabindex="-1" aria-hidden="true"></iframe></div>
+        <figcaption><b>write something new</b> click between words; further out writes more</figcaption>
+      </figure>
+    </div>
+  </div>
+
   <div id="tour">
-    <h2>try it here</h2>
+    <h2>try it yourself</h2>
     <ol id="steps">
       <li data-step="select"><b>select</b> words, then move</li>
       <li data-step="pin"><b>click</b> the ring to pin</li>
@@ -51,7 +81,7 @@
       <li data-step="shorter"><b>←</b> makes it shorter</li>
       <li data-step="write"><b>click</b> between words to write</li>
     </ol>
-    <iframe id="demo" title="feel, running on sample text"></iframe>
+    <iframe id="demo" data-frame="?demo" title="feel, running on sample text"></iframe>
     <p class="note">Sample data, canned replies. With your own text and a Cerebras key, a real model answers.</p>
   </div>
 </section>
