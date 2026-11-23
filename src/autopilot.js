@@ -1,7 +1,7 @@
 /**
  * The tour plays itself. A ghost cursor walks through each interaction by sending the same mouse and key events
- * a person would, so what is shown is the real interface. The moment a real cursor arrives, the show stops and
- * the visitor has the controls; it starts over a few seconds after they leave.
+ * a person would, so what is shown is the real interface. A real cursor passing over changes nothing; the first
+ * press or key stops the show and hands over the controls. It starts over a few seconds after the visitor leaves.
  */
 
 export const pilot = { running: false }
@@ -16,6 +16,7 @@ const RESUME_AFTER_MS = 3500
 export function startAutopilot(app) {
   const ghost = document.body.appendChild(Object.assign(document.createElement("div"), { id: "ghost" }))
   const note = document.body.appendChild(Object.assign(document.createElement("div"), { id: "demoNote" }))
+  const marks = document.body.appendChild(Object.assign(document.createElement("div"), { id: "ghostMarks" }))
   const at = { x: innerWidth / 2, y: innerHeight / 2 }
   let run = 0
   let visible = false
@@ -28,12 +29,23 @@ export function startAutopilot(app) {
     if (!visible) stop()
   })
 
-  for (const type of ["mousemove", "mousedown", "keydown", "wheel"]) {
+  /** While the show runs, the visitor's pointer must not steer it: movement and scrolling pass the app by. */
+  for (const type of ["mousemove", "wheel"]) {
+    addEventListener(type, (event) => {
+      if (event.isTrusted && pilot.running) event.stopImmediatePropagation()
+    }, true)
+  }
+  /** A press or a key is the visitor asking for the controls. That first one only takes over; it is not acted on. */
+  for (const type of ["mousedown", "keydown"]) {
     addEventListener(type, (event) => {
       if (!event.isTrusted) return
       clearTimeout(resume)
       resume = null
-      if (pilot.running) takeOver()
+      if (!pilot.running) return
+      if (type === "keydown" && (event.metaKey || event.ctrlKey || event.altKey)) return
+      event.stopImmediatePropagation()
+      event.preventDefault()
+      takeOver()
     }, true)
   }
   document.documentElement.addEventListener("mouseleave", (event) => {
@@ -51,16 +63,27 @@ export function startAutopilot(app) {
   function stop() {
     run++
     pilot.running = false
+    document.body.classList.remove("piloting")
     ghost.classList.remove("show")
-    getSelection().removeAllRanges()
+    mark([])
     say(null)
+  }
+
+  /** Paints a selection over the given boxes. Drawn by hand, because a frame without focus shows no real selection. */
+  function mark(boxes) {
+    marks.replaceChildren(...boxes.map((box) => {
+      const piece = document.createElement("i")
+      Object.assign(piece.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` })
+      return piece
+    }))
   }
 
   async function play() {
     const mine = ++run
     pilot.running = true
+    document.body.classList.add("piloting")
     ghost.classList.add("show")
-    note.textContent = "playing by itself · move your cursor here to try it"
+    note.textContent = "playing by itself · click here to try it yourself"
     try {
       while (true) {
         app.reset()
@@ -98,16 +121,15 @@ export function startAutopilot(app) {
       const start = app.text().indexOf(phrase), end = start + phrase.length
       const boxes = app.rects(start, end), first = boxes[0], last = boxes.at(-1)
       await moveTo(first.left, first.top + first.height / 2, 800)
-      const node = document.querySelector("#text").firstChild.firstChild
-      const steps = 14
+      const steps = Math.max(10, Math.round(phrase.length / 5))
       for (let i = 1; i <= steps; i++) {
-        getSelection().setBaseAndExtent(node, start, node, start + Math.round((phrase.length * i) / steps))
-        const box = app.rects(start, start + Math.max(1, Math.round((phrase.length * i) / steps))).at(-1)
-        await moveTo(box.right, box.top + box.height / 2, 45)
+        const sofar = app.rects(start, start + Math.max(1, Math.round((phrase.length * i) / steps)))
+        mark(sofar)
+        await moveTo(sofar.at(-1).right, sofar.at(-1).top + sofar.at(-1).height / 2, 40)
       }
       await moveTo(last.right, last.top + last.height / 2, 60)
-      await wait(250)
-      getSelection().removeAllRanges()
+      await wait(300)
+      mark([])
       app.select(start, end)
       await settled()
     }
@@ -129,6 +151,8 @@ export function startAutopilot(app) {
     await settled()
     await wait(1100)
     send("mousedown")
+    await wait(300)
+    await toRing(4, 0, 600)
     await wait(900)
 
     say("save")
