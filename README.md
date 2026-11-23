@@ -4,17 +4,39 @@ Steer your writing by meaning. Select some words, and a ring opens around the sc
 
 It is an experiment in how people could work with language models without describing what they want in a prompt first.
 
-## Try it
+## Run it locally
 
-```bash
-npm start
-```
+You need [Node.js](https://nodejs.org) 18 or newer and git. There is nothing to install and no build step.
 
-Then open http://localhost:4317. There is nothing to install and no backend: `npm start` only serves the files, and any static host works.
+1. Get the code:
 
-The front page shows six short clips, one per interaction, each the real app playing itself on sample text. Below them is the same sample to try by hand.
+   ```bash
+   git clone https://github.com/EDEN757/feeling_llm.git
+   cd feeling_llm
+   ```
 
-Out of the box it runs on a **simulator** with canned rewrites, which is enough to try the interaction on the sample letter. To use a real model, click **simulator · add key** and paste your own [Cerebras](https://cloud.cerebras.ai) API key. The key is stored only in your browser and sent only to `api.cerebras.ai`.
+2. Start it:
+
+   ```bash
+   npm start
+   ```
+
+3. Open http://localhost:4317 in a desktop browser.
+
+The front page shows six short clips, one per interaction, each the real app playing itself on sample text. Below them is the same sample to try by hand. Click **paste your own text** or **try a sample letter** to start writing.
+
+To stop it, press Ctrl+C in the terminal. For another port, run `PORT=5000 npm start`.
+
+`npm start` only serves the files. There is no backend, so any static file server works too, for example `python3 -m http.server` in this folder. Opening `index.html` straight from disk does not work, because browsers only load JavaScript modules over http.
+
+### Using a real model
+
+Out of the box it runs on a **simulator** with canned rewrites, which is enough to try the interaction on the sample letter. For your own text you need a model:
+
+1. Create an API key at [Cerebras](https://cloud.cerebras.ai).
+2. In the app, click **simulator · add key** in the top bar and paste it.
+
+The key is stored only in your browser (localStorage) and sent only to `api.cerebras.ai`, straight from your browser. It never passes through a server of this project, because there is none. **remove key** in the same dialog deletes it. What the model is asked, word for word, is in [src/llm/prompts.js](src/llm/prompts.js).
 
 ## How it works
 
@@ -57,12 +79,12 @@ tests/                   run with `npm test`
 
 A prototype. Your text and documents are kept in your browser. The prompts are still being tuned against real models, and it expects a mouse, a keyboard and a wide window.
 
+## License
+
+[MIT](LICENSE)
+
 ## Credits
 
 Made by [Edoardo Schiatti](https://github.com/EDEN757).
 
 Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun, which showed what realtime steering of text could feel like.
-
-## License
-
-[MIT](LICENSE)
