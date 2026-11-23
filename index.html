@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>feeling</title>
+<meta name="description" content="Steer your writing by meaning: select words, move toward what you mean." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<canvas id="screen"></canvas>
+
+<header id="top">
+  <span id="status"><b>feeling</b></span>
+  <span>
+    <button id="documents">documents</button>
+    <button id="live"></button>
+    <button id="sound"></button>
+    <button id="edit">edit text</button>
+  </span>
+</header>
+
+<section id="start">
+  <h1>feeling</h1>
+  <p>Steer your writing by meaning: select words, then move toward what you mean.</p>
+  <menu>
+    <button id="startOwn">paste your own text</button>
+    <button id="startSample">try a sample letter</button>
+  </menu>
+  <footer>made by <a href="https://github.com/EDEN757" target="_blank" rel="noopener">Edoardo Schiatti</a></footer>
+</section>
+
+<main id="text"></main>
+<textarea id="editor" spellcheck="false" aria-label="Your text" placeholder="paste or type your text, then press done (top right)"></textarea>
+
+<aside id="refs">
+  <header><h2>your documents</h2><button id="refsClose" title="close">×</button></header>
+  <p class="note">With the ring open, click a passage to reference it.</p>
+  <div id="docs"></div>
+  <button id="docAdd">+ add a document</button>
+  <form id="docForm" hidden>
+    <input id="docTitle" placeholder="title" autocomplete="off" aria-label="Document title" />
+    <textarea id="docBody" placeholder="paste or type the text · blank lines separate passages" spellcheck="false" aria-label="Document text"></textarea>
+    <menu><button type="button" id="docCancel">cancel</button><button>add</button></menu>
+  </form>
+</aside>
+<div id="refsTab">references ›</div>
+
+<div id="meter"></div>
+<div id="ask">
+  <span id="asked" title="click to remove"></span>
+  <span class="mark">&gt;</span>
+  <input id="askInput" maxlength="200" autocomplete="off" spellcheck="false" aria-label="Ask for a change" />
+</div>
+<div id="hint"></div>
+<div id="toast" role="status"></div>
+
+<dialog id="keyDialog">
+  <form method="dialog">
+    <h2>go live with Cerebras</h2>
+    <p>Without a key, feeling runs on a simulator with canned rewrites. With your own Cerebras API key it uses a real model.</p>
+    <p>The key is stored only in this browser and sent only to api.cerebras.ai.</p>
+    <label>API key <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="csk-…" /></label>
+    <label>model <input id="modelInput" autocomplete="off" spellcheck="false" /></label>
+    <menu>
+      <button value="remove">remove key</button>
+      <button value="cancel">cancel</button>
+      <button value="save">save</button>
+    </menu>
+  </form>
+</dialog>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

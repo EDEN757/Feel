@@ -1,0 +1,103 @@
+:root { --bg: #000; --fg: #fff; --mid: #8a8a8a; --low: #444; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; --panel: 330px; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font: 400 16px/1.9 var(--mono); -webkit-font-smoothing: antialiased; }
+body.open { cursor: none; }
+button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; z-index: 4; }
+
+#top { position: fixed; top: 0; left: 0; right: 0; padding: 18px 24px 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mid); z-index: 3; transition: opacity .3s; background: linear-gradient(#000 60%, transparent); }
+#top b { color: var(--fg); font-weight: 500; }
+#top button { color: var(--mid); margin-left: 18px; }
+#top button:hover { color: var(--fg); }
+body.open #top { opacity: 0; pointer-events: none; }
+
+#text { position: relative; margin: 0 auto; padding: 22vh 0 45vh; width: min(46ch, 80vw); white-space: pre-wrap; z-index: 2; cursor: text; }
+#text::selection, #text *::selection { background: #fff; color: #000; }
+body.open #text { user-select: none; pointer-events: none; }
+#text > span { transition: color .3s; }
+body.open #text > span:not(.seg):not(.ghost) { color: #555; }
+.seg { text-decoration: underline dotted var(--mid); text-underline-offset: 5px; }
+.seg .new { background: var(--fg); color: var(--bg); }
+.seg .doomed { background: var(--fg); color: var(--bg); }
+.seg .born { animation: born .7s ease-out; }
+.seg.waiting .new, .ghost.waiting { animation: think 0.9s ease-in-out infinite; }
+.seg.fading { text-decoration: none; }
+.seg.fading .new { animation: afterglow 1.6s ease-out forwards; }
+.ghost { color: #b5b5b5; text-decoration: underline dotted #666; text-underline-offset: 5px; }
+.ghost.fading { animation: settle 1.6s ease-out forwards; text-decoration: none; }
+.caret { display: inline-block; width: .55em; height: 1.05em; vertical-align: -0.18em; background: var(--fg); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes afterglow { 0%, 35% { background: var(--fg); color: var(--bg); } 100% { background: transparent; color: var(--fg); } }
+@keyframes settle { 0%, 30% { color: var(--bg); background: var(--fg); } 100% { color: var(--fg); background: transparent; } }
+@keyframes born { from { background: var(--fg); color: var(--bg); } to { background: transparent; } }
+@keyframes think { 50% { background: #777; } }
+
+#refs { position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel); z-index: 5; background: #050505; border-left: 1px solid #222; padding: 70px 22px 80px; overflow-y: auto;
+  transform: translateX(100%); transition: transform .45s cubic-bezier(.2,.7,.1,1); font-size: 12.5px; line-height: 1.7; cursor: default; }
+#refs.show { transform: none; }
+#refs h2 { font: 500 11px var(--mono); letter-spacing: .12em; color: var(--mid); margin: 0 0 8px; text-transform: uppercase; }
+.doc { margin-bottom: 22px; }
+.doc h3 { font: 500 12.5px var(--mono); margin: 0 0 6px; }
+.doc p { margin: 0 0 6px; color: #9a9a9a; padding: 4px 6px; margin-left: -6px; border-radius: 2px; cursor: crosshair; transition: background .15s, color .15s; }
+.doc p:hover { background: #151515; color: var(--fg); }
+.doc p.pinned { background: var(--fg); color: var(--bg); }
+#refsTab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; font-size: 11px; letter-spacing: .14em; color: var(--mid);
+  padding: 14px 6px; border-left: 1px solid #333; z-index: 5; display: none; pointer-events: none; }
+body.open #refsTab { display: block; }
+#refs.show ~ #refsTab { display: none; }
+
+#hint { position: fixed; bottom: 0; left: 0; right: 0; padding: 34px 4vw 16px; text-align: center; font-size: 12px; color: var(--mid); z-index: 3; pointer-events: none; background: linear-gradient(transparent, #000 55%); }
+#hint b { color: var(--fg); font-weight: 500; }
+#meter { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); font-size: 12px; z-index: 6; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#meter.show { opacity: 1; }
+#ask { position: fixed; left: 50%; bottom: 66px; transform: translateX(-50%); width: min(640px, 82vw); display: none; align-items: baseline; gap: 1ch; font-size: 14px; z-index: 6; cursor: text; }
+body.open #ask { display: flex; }
+#ask .mark { color: var(--fg); }
+#askInput { flex: 1; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; caret-color: var(--fg); }
+#askInput:focus { border-bottom-color: var(--fg); }
+#askInput::placeholder { color: #666; }
+#asked { display: none; font-size: 12px; color: var(--bg); background: var(--fg); padding: 0 6px; cursor: pointer; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+#asked.show { display: inline-block; }
+#ask.thinking #askInput { animation: think 0.9s ease-in-out infinite; }
+#toast { position: fixed; bottom: 48px; left: 24px; color: #ff8f73; font-size: 12px; z-index: 6; }
+#editor { display: none; margin: 18vh auto 0; width: min(46ch, 80vw); min-height: 60vh; font: inherit; color: var(--fg); background: none; border: 1px solid var(--low); padding: 14px; outline: none; resize: vertical; }
+body.editing #editor { display: block; }
+body.editing #text { display: none; }
+
+dialog { font: 400 13px/1.7 var(--mono); color: var(--fg); background: #050505; border: 1px solid #333; padding: 26px 28px; width: min(460px, 90vw); }
+dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
+dialog h2 { font: 500 13px var(--mono); margin: 0 0 12px; }
+dialog p { margin: 0 0 10px; color: var(--mid); }
+dialog label { display: grid; grid-template-columns: 8ch 1fr; align-items: baseline; margin-top: 12px; color: var(--mid); }
+dialog input { font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; }
+dialog input:focus { border-bottom-color: var(--fg); }
+dialog menu { display: flex; justify-content: flex-end; gap: 22px; margin: 24px 0 0; padding: 0; }
+dialog menu button { color: var(--mid); }
+dialog menu button:hover, dialog menu button[value="save"] { color: var(--fg); }
+
+#refs header { display: flex; justify-content: space-between; align-items: baseline; }
+#refs header button, #refs #docAdd, #refs menu button { color: var(--mid); }
+#refs header button:hover, #refs #docAdd:hover, #refs menu button:hover { color: var(--fg); }
+#refs .note { color: #666; margin: 0 0 20px; }
+.doc h3 { display: flex; justify-content: space-between; gap: 1ch; }
+.doc .remove { color: #555; }
+.doc .remove:hover, .doc .remove.armed { color: #ff8f73; }
+#docForm { display: grid; gap: 10px; margin-top: 6px; }
+#docForm[hidden] { display: none; }
+#docForm input, #docForm textarea { font: inherit; color: var(--fg); background: none; border: 1px solid #333; padding: 6px 8px; outline: none; }
+#docForm input:focus, #docForm textarea:focus { border-color: var(--fg); }
+#docForm textarea { min-height: 140px; resize: vertical; }
+#docForm menu { display: flex; justify-content: flex-end; gap: 18px; margin: 0; padding: 0; }
+
+#start { position: fixed; inset: 0; display: none; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; z-index: 2; }
+body.empty:not(.editing) #start { display: grid; }
+body.empty #text, body.empty #hint, body.empty:not(.editing) #edit { display: none; }
+#start h1 { font: 500 16px var(--mono); margin: 0; }
+#start p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
+#start menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 28px; margin: 18px 0 0; padding: 0; }
+#start button { border-bottom: 1px solid var(--mid); padding: 2px 0; }
+#start button:hover { border-bottom-color: var(--fg); }
+#start footer { position: fixed; bottom: 22px; left: 0; right: 0; font-size: 12px; color: #666; }
+#start footer a { color: var(--mid); text-decoration: none; border-bottom: 1px solid #444; }
+#start footer a:hover { color: var(--fg); border-bottom-color: var(--fg); }

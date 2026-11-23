@@ -1,17 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "bloom-mock",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "mock"],
-      "port": 4317
-    },
-    {
-      "name": "bloom",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
-      "port": 4317
-    }
+    { "name": "feeling", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 4317 }
   ]
 }

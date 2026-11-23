@@ -1,116 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Ring</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-  :root { --bg: #000; --fg: #fff; --mid: #8a8a8a; --low: #444; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; --panel: 330px; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--fg); }
-  body { font: 400 16px/1.9 var(--mono); -webkit-font-smoothing: antialiased; }
-  body.open { cursor: none; }
-  button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
-  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; z-index: 4; }
-
-  #top { position: fixed; top: 0; left: 0; right: 0; padding: 18px 24px 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mid); z-index: 3; transition: opacity .3s; background: linear-gradient(#000 60%, transparent); }
-  #top b { color: var(--fg); font-weight: 500; }
-  #top button { color: var(--mid); margin-left: 18px; }
-  #top button:hover { color: var(--fg); }
-  body.open #top { opacity: 0; pointer-events: none; }
-
-  #text { position: relative; margin: 0 auto; padding: 22vh 0 45vh; width: min(46ch, 80vw); white-space: pre-wrap; z-index: 2; cursor: text; }
-  #text::selection, #text *::selection { background: #fff; color: #000; }
-  body.open #text { user-select: none; pointer-events: none; }
-  #text > span { transition: color .3s; }
-  body.open #text > span:not(.seg):not(.ghost) { color: #555; }
-  .seg { text-decoration: underline dotted var(--mid); text-underline-offset: 5px; }
-  .seg .new { background: var(--fg); color: var(--bg); }
-  .seg .doomed { background: var(--fg); color: var(--bg); }
-  .seg .born { animation: born .7s ease-out; }
-  .seg.waiting .new, .ghost.waiting { animation: think 0.9s ease-in-out infinite; }
-  .seg.fading { text-decoration: none; }
-  .seg.fading .new { animation: afterglow 1.6s ease-out forwards; }
-  .ghost { color: #b5b5b5; text-decoration: underline dotted #666; text-underline-offset: 5px; }
-  .ghost.fading { animation: settle 1.6s ease-out forwards; text-decoration: none; }
-  .caret { display: inline-block; width: .55em; height: 1.05em; vertical-align: -0.18em; background: var(--fg); animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  @keyframes afterglow { 0%, 35% { background: var(--fg); color: var(--bg); } 100% { background: transparent; color: var(--fg); } }
-  @keyframes settle { 0%, 30% { color: var(--bg); background: var(--fg); } 100% { color: var(--fg); background: transparent; } }
-  @keyframes born { from { background: var(--fg); color: var(--bg); } to { background: transparent; } }
-  @keyframes think { 50% { background: #777; } }
-
-  #refs { position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel); z-index: 5; background: #050505; border-left: 1px solid #222; padding: 70px 22px 80px; overflow-y: auto;
-    transform: translateX(100%); transition: transform .45s cubic-bezier(.2,.7,.1,1); font-size: 12.5px; line-height: 1.7; cursor: default; }
-  #refs.show { transform: none; }
-  #refs h2 { font: 500 11px var(--mono); letter-spacing: .12em; color: var(--mid); margin: 0 0 18px; text-transform: uppercase; }
-  .doc { margin-bottom: 22px; }
-  .doc h3 { font: 500 12.5px var(--mono); margin: 0 0 6px; }
-  .doc p { margin: 0 0 6px; color: #9a9a9a; padding: 4px 6px; margin-left: -6px; border-radius: 2px; cursor: crosshair; transition: background .15s, color .15s; }
-  .doc p:hover { background: #151515; color: var(--fg); }
-  .doc p.pinned { background: var(--fg); color: var(--bg); }
-  #refsTab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; font-size: 11px; letter-spacing: .14em; color: var(--mid);
-    padding: 14px 6px; border-left: 1px solid #333; z-index: 5; display: none; pointer-events: none; }
-  body.open #refsTab { display: block; }
-  #refs.show ~ #refsTab { display: none; }
-
-  #hint { position: fixed; bottom: 0; left: 0; right: 0; padding: 34px 4vw 16px; text-align: center; font-size: 12px; color: var(--mid); z-index: 3; pointer-events: none; background: linear-gradient(transparent, #000 55%); }
-  #hint b { color: var(--fg); font-weight: 500; }
-  #meter { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); font-size: 12px; z-index: 6; opacity: 0; transition: opacity .3s; pointer-events: none; }
-  #meter.show { opacity: 1; }
-  #ask { position: fixed; left: 50%; bottom: 66px; transform: translateX(-50%); width: min(640px, 82vw); display: none; align-items: baseline; gap: 1ch; font-size: 14px; z-index: 6; cursor: text; }
-  body.open #ask { display: flex; }
-  #ask .mark { color: var(--fg); }
-  #askInput { flex: 1; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; caret-color: var(--fg); }
-  #askInput:focus { border-bottom-color: var(--fg); }
-  #askInput::placeholder { color: #666; }
-  #asked { display: none; font-size: 12px; color: var(--bg); background: var(--fg); padding: 0 6px; cursor: pointer; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
-  #asked.show { display: inline-block; }
-  #ask.thinking #askInput { animation: think 0.9s ease-in-out infinite; }
-  #toast { position: fixed; bottom: 48px; left: 24px; color: #ff8f73; font-size: 12px; z-index: 6; }
-  #editor { display: none; margin: 18vh auto 0; width: min(46ch, 80vw); min-height: 60vh; font: inherit; color: var(--fg); background: none; border: 1px solid var(--low); padding: 14px; outline: none; resize: vertical; }
-  body.editing #editor { display: block; }
-  body.editing #text { display: none; }
-</style>
-</head>
-<body>
-<canvas id="screen"></canvas>
-<div id="top"><span id="status"><b>feeling</b></span><span><button id="sound"></button><button id="edit">edit text</button></span></div>
-<div id="text"></div>
-<textarea id="editor" spellcheck="false"></textarea>
-<aside id="refs"><h2>your documents · click a passage to reference it</h2><div id="docs"></div></aside>
-<div id="refsTab">references ›</div>
-<div id="meter"></div>
-<div id="ask"><span id="asked" title="click to remove"></span><span class="mark">&gt;</span><input id="askInput" maxlength="200" autocomplete="off" spellcheck="false" placeholder="type what you want, ↵ to apply" /></div>
-<div id="hint"></div>
-<div id="toast"></div>
-
-<script>
-const SAMPLE = `Dear hiring team,
-
-For three years I have built data tools for a small research team at a university lab. I think I could help your company, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.
-
-Most of my work started with a messy question from a biologist or a policy researcher. I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app. I learned that the hardest part is rarely the code. It is understanding what people need before they can say it.
-
-Last year I built a pipeline that cut the time to prepare a dataset from two weeks to one afternoon. I am proud of it, but I think the part that mattered most was the documentation, because it meant the team could keep using it after I moved on.
-
-I am drawn to your company because you build tools for people who are not engineers. That is the kind of problem I enjoy, and I think my background, somewhere between research and software, would be useful for that work.
-
-I would be glad to talk about how I could help. Thank you for your time.
-
-Best regards,
-Alex`;
-
-/** Placeholder documents the writer made earlier; later these come from their own files. */
-const DOCS = [
-  { title: "thesis abstract", paragraphs: ["My master's thesis asked whether city sensor data could predict which streets flood first.", "I combined ten years of rainfall records with residents' complaints and reached 81% accuracy at street level."] },
-  { title: "pipeline notes", paragraphs: ["Ingestion pipeline in Python and DuckDB, replacing a manual spreadsheet process.", "Prep time went from two weeks to one afternoon; four teams now use it, onboarding docs included."] },
-  { title: "letter to Studio Nord", paragraphs: ["What draws me to small studios is seeing a tool used the week it ships.", "I like being close enough to users to hear what confuses them."] },
-  { title: "supervisor's feedback", paragraphs: ["Alex is the person everyone asks when a dataset stops making sense.", "Explains technical trade-offs to non-technical colleagues with unusual patience."] },
-];
+import { documents } from "./documents.js";
+import { SAMPLE } from "./sample.js";
+import { isLive, request as api, settings } from "./llm/index.js";
 
 const NAMES = { edit: ["", "slight", "medium", "strong"], write: ["", "phrase", "sentence", "paragraph"] };
 const KEYS = ["", "slight", "medium", "strong"];
@@ -120,6 +10,7 @@ const BLEND_DEGREES = 7;
 const SCROLL_PAUSE = 450;
 const PANEL = 330, EDGE = 26;
 const COMBO_WINDOW = 320;
+const MAX_PINS = 4;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("screen"), ctx = canvas.getContext("2d");
@@ -127,7 +18,8 @@ const textEl = $("text"), hintEl = $("hint"), statusEl = $("status"), toastEl = 
 const refsEl = $("refs"), meterEl = $("meter");
 
 let W = 0, H = 0, RX = 0, RY = 0, CX = 0, CY = 0;
-let text = SAMPLE;
+const TEXT_STORAGE = "feeling-text";
+let text = stored();
 let seg = null;
 let changes = 0;
 let mouse = { x: -1, y: -1 };
@@ -162,17 +54,30 @@ function resize() {
 
 /** The ring shrinks to the left while the references panel is out. */
 function layoutRing() {
-  const room = W - PANEL * easeOut(refsT);
-  CX = room / 2; CY = H / 2;
-  RX = Math.max(60, room / 2 - Math.max(110, room * 0.1));
+  CX = W / 2; CY = H / 2;
+  RX = Math.max(60, W / 2 - Math.max(110, W * 0.1));
   RY = Math.max(60, H / 2 - 64);
 }
 
 function buildDocs() {
-  $("docs").innerHTML = DOCS.map((d, i) => `<div class="doc"><h3>${esc(d.title)}</h3>${d.paragraphs.map((p, j) => `<p data-doc="${i}" data-para="${j}">${esc(p)}</p>`).join("")}</div>`).join("");
+  $("docs").innerHTML = documents.all.map((d, i) => `<div class="doc"><h3>${esc(d.title)}<button class="remove" data-doc="${i}" title="delete this document">×</button></h3>${d.paragraphs.map((p, j) => `<p data-doc="${i}" data-para="${j}">${esc(p)}</p>`).join("")}</div>`).join("") || `<p class="note">no documents yet</p>`;
+  renderPanel();
+}
+
+function stored() {
+  try { return localStorage.getItem(TEXT_STORAGE) ?? ""; } catch { return ""; }
+}
+
+/** Keeps the text for the next visit. A passage still being shaped is not part of it until it is saved. */
+function remember() {
+  if (remember.last === text) return;
+  remember.last = text;
+  try { text ? localStorage.setItem(TEXT_STORAGE, text) : localStorage.removeItem(TEXT_STORAGE); } catch {}
 }
 
 function render() {
+  remember();
+  document.body.classList.toggle("empty", !text);
   renderText();
   statusEl.innerHTML = `<b>feeling</b>${changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : ""}`;
   document.body.classList.toggle("open", isOpen());
@@ -183,7 +88,7 @@ function render() {
     const what = seg.mode === "write" ? "a move, further out writes more" : "a meaning, nearer the edge is stronger";
     const pins = seg.pins.length ? ` (${seg.pins.length} pinned)` : "";
     const arrows = seg.mode === "edit" ? " · <b>← ↓</b> shorter, tap fast for more · <b>→ ↑</b> back (when the ask bar is empty)" : "";
-    hintEl.innerHTML = `<b>move</b> toward ${what} · <b>click</b> to pin${pins} · <b>↵</b> save${arrows}<br><b>scroll</b> ↓ new ${seg.mode === "write" ? "moves" : "meanings"} ↑ back (${seg.setIndex + 1}/${seg.sets.length}) · push the <b>right edge</b> for references · <b>type</b> to ask for anything · <b>esc</b> cancel`;
+    hintEl.innerHTML = `<b>move</b> toward ${what} · <b>click</b> to pin${pins} · <b>↵</b> save${arrows}<br><b>scroll</b> ↓ new ${seg.mode === "write" ? "moves" : "meanings"} ↑ back (${seg.setIndex + 1}/${seg.sets.length}) · push the <b>right edge</b> for references · <b>type</b> to ask (↵ changes the text, ⇧↵ only the ring) · <b>esc</b> cancel`;
   }
   renderPanel();
   renderAsk();
@@ -194,7 +99,7 @@ function renderAsk() {
   askedEl.classList.toggle("show", !!prompt);
   askedEl.textContent = prompt ? `asked: ${prompt.query} ×` : "";
   askEl.classList.toggle("thinking", !!seg?.asking);
-  askInput.placeholder = seg?.asking ? "thinking…" : prompt ? "ask again to refine, or steer with the ring" : seg?.mode === "write" ? "type what you want to add, ↵ to write it" : "type how you want this changed, ↵ to apply";
+  askInput.placeholder = seg?.asking ? "thinking…" : prompt ? "ask again to refine · ⇧↵ only adds it to the ring" : `type what you want · ↵ ${seg?.mode === "write" ? "writes it" : "changes the text"} · ⇧↵ only adds it to the ring`;
 }
 
 function renderText() {
@@ -262,6 +167,7 @@ function open(fields) {
   seg = { ...fields, current: fields.original, preview: null, sets: [], setIndex: 0, pins: [], history: [] };
   openT = 0;
   sound.wake();
+  if (seg.mode === "edit") ahead(ladderOf(seg).versions);
   render();
   centerOn(textEl.querySelector(".seg, .ghost"));
   loadSet(seg);
@@ -297,17 +203,20 @@ function forget() {
 }
 
 async function loadSet(target) {
-  const seen = target.sets.flat().map((d) => d.label);
+  const replacing = !!target.stale;
+  const seen = replacing ? [] : target.sets.flat().map((d) => d.label);
   target.loading = true;
   render();
+  const route = target.mode === "write" ? "moves" : "bloom";
   try {
-    const route = target.mode === "write" ? "moves" : "bloom";
     const { directions } = await api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: seen });
     if (seg !== target) return;
+    if (replacing) { target.sets = []; target.stale = false; }
     target.sets.push(directions.slice(0, MAX_MEANINGS).map((d) => ({ ...d, kind: "suggested", basis: basisOf(target) })));
     target.setIndex = target.sets.length - 1;
     labelT = 0;
     glow = [];
+    ahead(api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: target.sets.flat().map((d) => d.label) }));
   } catch (error) {
     toast(error.message);
     if (!target.sets.length && seg === target) seg = null;
@@ -316,12 +225,9 @@ async function loadSet(target) {
   render();
 }
 
-async function api(route, payload) {
-  const res = await fetch(`/api/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
-  return json;
-}
+
+/** Marks a request as made ahead of need: its reply is remembered, and a failure can wait until it is asked for again. */
+function ahead(reply) { reply.catch(() => {}); }
 
 /* ---------- aiming, pins and combining ---------- */
 
@@ -344,7 +250,7 @@ function aimAt(x, y) {
   return { index, level, q, deg, blendWith: level ? blendWith : null };
 }
 
-function overPanel(x) { return refsT > 0.5 && x > W - PANEL; }
+function overPanel(x) { return refsEl.classList.contains("show") && x > W - PANEL; }
 
 function updateAim() {
   if (!isOpen()) return;
@@ -397,34 +303,60 @@ function contextOf(target) {
   return { mode: "edit", text: text.slice(0, target.start) + inserted + text.slice(target.end), start: target.start, end: target.start + inserted.length };
 }
 
-/** Every pull together: a single plain pull is instant, anything combined (or with references) asks the model. */
+const refsOf = (pulls) => pulls.filter((p) => p.kind === "ref").map((p) => ({ title: p.doc.title, text: p.text }));
+
+/** Pulls as the model reads them: one weight per label, the strongest pull on it. */
+function weighed(pulls, mode) {
+  const weights = new Map();
+  for (const p of pulls.filter((p) => p.kind === "meaning")) for (const d of [p.dir, p.partner].filter(Boolean)) weights.set(d.label, Math.max(weights.get(d.label) ?? 0, p.level / 3));
+  return [...weights].map(([label, weight]) => ({ label, weight, length: mode === "write" ? NAMES.write[Math.round(weight * 3)] : undefined }));
+}
+
+/**
+ * Every pull together. Three ways to answer, fastest first:
+ * a single plain pull is already in the ring's options; the pins plus one more plain pull come from the grid,
+ * which is asked for as soon as the pins change, before the cursor gets anywhere; anything else asks on the spot.
+ */
 async function combine(target, pulls) {
   const meanings = pulls.filter((p) => p.kind === "meaning");
-  const refs = pulls.filter((p) => p.kind === "ref").map((p) => ({ title: p.doc.title, text: p.text }));
   const level = Math.max(1, ...meanings.map((p) => p.level));
   const base = basisOf(target);
   const done = (t) => (target.mode === "write" ? placed(t, target.prompt ? lengthOf(t) : level) : t);
-  if (!meanings.length && !refs.length) return target.prompt ? done(base) : target.original;
-  if (meanings.length === 1 && !meanings[0].partner && !refs.length && meanings[0].dir.basis === base) return done(meanings[0].dir[KEYS[meanings[0].level]]);
+  if (!pulls.length) return target.prompt ? done(base) : target.original;
+  if (pulls.length === 1 && meanings.length === 1 && !meanings[0].partner && meanings[0].dir.basis === base) return done(meanings[0].dir[KEYS[meanings[0].level]]);
+
   const context = contextOf(target);
-  const weights = new Map();
-  for (const p of meanings) for (const d of [p.dir, p.partner].filter(Boolean)) weights.set(d.label, Math.max(weights.get(d.label) ?? 0, p.level / 3));
-  const pullsOut = [...weights].map(([label, weight]) => ({ label, weight, length: context.mode === "write" ? NAMES.write[Math.round(weight * 3)] : undefined }));
-  const { text: out } = await api("compose", { ...context, refs, pulls: pullsOut });
+  const pinned = pulls.filter((p) => target.pins.includes(p)), extra = pulls.filter((p) => !target.pins.includes(p));
+  const set = currentSet() ?? [];
+  if (!extra.length || (extra.length === 1 && !extra[0].partner && set.includes(extra[0].dir))) {
+    const grid = await api("grid", { ...context, refs: refsOf(pinned), pins: weighed(pinned, context.mode), options: set.map((d) => d.label) });
+    const row = extra.length ? grid.options.find((option) => option.label === extra[0].dir.label) : null;
+    if (!extra.length) return done(grid.text);
+    if (row) return done(row[KEYS[extra[0].level]]);
+  }
+  const { text: out } = await api("compose", { ...context, refs: refsOf(pulls), pulls: weighed(pulls, context.mode) });
   return done(out);
 }
 
 /** The writer's own words: rewrites (or writes) what they ask, then swaps in ring options that steer from that result. */
-async function askFor(query) {
+async function askFor(query, apply = true) {
   const target = seg;
   if (!target || target.asking) return;
   if (!query) return clearPrompt();
-  target.asking = true; target.waiting = true;
+  target.asking = true; target.waiting = apply;
   render();
   try {
     const keep = (currentSet() ?? []).map((d) => d.label);
-    const { text: result, directions } = await api("prompt", { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, count: MEANINGS });
+    const asked = { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, refs: refsOf(target.pins), count: MEANINGS, apply };
+    const { text: result, directions } = await api("prompt", asked);
     if (seg !== target) return;
+    if (!apply) {
+      target.sets.push(directions.map((d) => ({ ...d, kind: d.kept ? "kept" : "suggested", basis: basisOf(target) })));
+      target.setIndex = target.sets.length - 1;
+      labelT = 0; glow = []; aim = null;
+      sound.swap();
+      return;
+    }
     if (target.promptFrom == null) target.promptFrom = target.setIndex;
     target.prompt = { query: target.prompt ? `${target.prompt.query} → ${query}` : query, text: result };
     target.pins = target.pins.filter((p) => p.kind === "ref");
@@ -433,10 +365,10 @@ async function askFor(query) {
     labelT = 0; glow = []; aim = null;
     sound.swap();
   } catch (error) { toast(error.message); }
-  target.asking = false; target.waiting = false;
-  render();
-  updateAim();
-  refreshPreview();
+  finally {
+    target.asking = false; target.waiting = false;
+    if (seg === target) { render(); updateAim(); refreshPreview(); }
+  }
 }
 
 function clearPrompt() {
@@ -454,16 +386,19 @@ let previewToken = 0, previewTimer = null;
 function refreshPreview() {
   if (!seg) return;
   const target = seg, pulls = pullsNow(), token = ++previewToken;
+  const current = () => token === previewToken && seg === target;
   clearTimeout(previewTimer);
-  const instant = pulls.length === 0 || (pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner);
   const run = async () => {
+    const slow = setTimeout(() => { if (current()) { target.waiting = true; renderText(); } }, 150);
     try {
       const t = await combine(target, pulls);
-      if (token === previewToken && seg === target) { target.preview = pulls.length || target.prompt ? t : null; target.waiting = !!target.asking; renderText(); }
-    } catch (error) { toast(error.message); }
+      if (current()) { target.preview = pulls.length || target.prompt ? t : null; target.waiting = !!target.asking; renderText(); }
+    } catch (error) { if (current()) toast(error.message); }
+    clearTimeout(slow);
   };
-  if (instant) run();
-  else { target.waiting = true; renderText(); previewTimer = setTimeout(run, 140); }
+  const betweenTwo = pulls.some((p) => p.partner && !target.pins.includes(p));
+  if (betweenTwo) previewTimer = setTimeout(run, 140);
+  else run();
 }
 
 function nearPin(x, y) {
@@ -474,7 +409,7 @@ addEventListener("mousemove", (e) => {
   mouse = { x: e.clientX, y: e.clientY };
   trail.push({ x: mouse.x, y: mouse.y, at: performance.now() });
   if (isOpen()) {
-    const wantPanel = mouse.x > W - EDGE || (refsEl.classList.contains("show") && mouse.x > W - PANEL - 40) || seg.pins.some((p) => p.kind === "ref");
+    const wantPanel = mouse.x > W - EDGE || (refsEl.classList.contains("show") && mouse.x > W - PANEL - 40) || refsEl.contains(document.activeElement);
     refsEl.classList.toggle("show", wantPanel);
   }
   updateAim();
@@ -504,7 +439,7 @@ function swapped() {
 
 addEventListener("mousedown", (e) => {
   if (!isOpen() || e.target.closest("#ask, #top")) return;
-  const para = e.target.closest("#refs p");
+  const para = e.target.closest("#refs .doc p");
   if (e.target.closest("#refs") && !para) return;
   e.preventDefault();
   const pin = nearPin(e.clientX, e.clientY);
@@ -512,19 +447,25 @@ addEventListener("mousedown", (e) => {
     seg.pins = seg.pins.filter((p) => p !== pin);
     sound.unpin();
   } else if (para) {
-    const doc = DOCS[+para.dataset.doc], passage = doc.paragraphs[+para.dataset.para];
+    const doc = documents.all[+para.dataset.doc], passage = doc.paragraphs[+para.dataset.para];
     const existing = seg.pins.find((p) => p.kind === "ref" && p.text === passage);
     if (existing) { seg.pins = seg.pins.filter((p) => p !== existing); sound.unpin(); }
     else {
-      seg.pins.push({ kind: "ref", doc, text: passage, el: para, born: performance.now(), level: 1,
-        get x() { return this.el.getBoundingClientRect().left + 4; },
-        get y() { const r = this.el.getBoundingClientRect(); return r.top + Math.min(r.height / 2, 14); } });
+      seg.pins.push({ kind: "ref", doc, text: passage, homeY: e.clientY, born: performance.now(), level: 1,
+        get x() { return W - 8 - PANEL * easeOut(refsT); },
+        get y() {
+          const el = refsT > 0.5 && [...refsEl.querySelectorAll(".doc p")].find((p) => p.textContent === this.text);
+          if (!el) return this.homeY;
+          const r = el.getBoundingClientRect();
+          return Math.max(24, Math.min(H - 24, r.top + Math.min(r.height / 2, 14)));
+        } });
       planted.push({ x: e.clientX, y: e.clientY, born: performance.now(), level: 1 });
       sound.plant(2);
     }
   } else {
     const a = aimAt(e.clientX, e.clientY);
     if (!a?.level) return;
+    if (seg.pins.filter((p) => p.kind === "meaning").length >= MAX_PINS) return toast(`up to ${MAX_PINS} pins: click one to remove it`);
     seg.pins.push({ ...pullOf(a), q: a.q, deg: a.deg, born: performance.now(),
       get x() { return ellipsePoint(this.q, this.deg)[0]; },
       get y() { return ellipsePoint(this.q, this.deg)[1]; } });
@@ -586,18 +527,32 @@ function shrinkKey(direction) {
   shrinkState.timer = setTimeout(runShrink, 170);
 }
 
+/** Five shorter versions of the passage, asked for when it is selected so the arrows answer at once. */
+function ladderOf(target) {
+  target.ladder ??= { rung: 0, versions: api("shrinks", { text, start: target.start, end: target.end }).then((reply) => reply.versions) };
+  return target.ladder;
+}
+
 async function runShrink() {
   if (shrinkState.busy || !seg || seg.mode !== "edit") return;
   const steps = Math.max(1, Math.round(shrinkState.pending));
   shrinkState.pending = 0;
-  if (!steps) return;
   shrinkState.busy = true;
   const target = seg, before = target.original;
   try {
-    const { text: shorter } = await api("shrink", { text, start: target.start, end: target.end, steps });
-    if (seg !== target || !shorter || shorter.length >= before.length) { shrinkState.busy = false; showMeter(); return; }
-    await shatter(target, before, shorter);
-    target.history.push(before);
+    let ladder = ladderOf(target), versions = await ladder.versions;
+    if (ladder.rung >= versions.length) {
+      target.ladder = null;
+      ladder = ladderOf(target);
+      versions = await ladder.versions;
+    }
+    const rung = Math.min(versions.length, ladder.rung + steps);
+    const shorter = versions.slice(ladder.rung, rung).findLast((version) => version && version.length < before.length);
+    if (seg === target && shorter) {
+      target.history.push({ text: before, rung: ladder.rung });
+      ladder.rung = rung;
+      await shatter(target, before, shorter);
+    }
   } catch (error) { toast(error.message); }
   shrinkState.busy = false;
   showMeter();
@@ -640,8 +595,10 @@ function renderBorn(target, before, after) {
 
 function grow() {
   const target = seg;
-  const previous = target.history.pop();
-  if (!previous) return toast("nothing to bring back");
+  const entry = target.history.pop();
+  if (!entry) return toast("nothing to bring back");
+  const previous = entry.text;
+  if (target.ladder) target.ladder.rung = entry.rung;
   text = text.slice(0, target.start) + previous + text.slice(target.end);
   target.end = target.start + previous.length;
   const before = target.original;
@@ -657,14 +614,14 @@ function reloadSoon(target) {
   clearTimeout(target.reloadTimer);
   target.reloadTimer = setTimeout(() => {
     if (seg !== target) return;
-    target.sets = []; target.setIndex = 0;
+    target.stale = true;
     loadSet(target);
   }, 700);
 }
 
 function showMeter() {
   if (!seg) return;
-  const base = seg.history[0] ?? seg.original;
+  const base = seg.history[0]?.text ?? seg.original;
   const words = (t) => t.split(/\s+/).filter(Boolean).length;
   const ratio = 1 - words(seg.original) / Math.max(1, words(base));
   const blocks = Math.min(10, Math.round(ratio * 10));
@@ -702,7 +659,7 @@ function moveInAsk(key) {
 }
 
 addEventListener("keydown", (e) => {
-  if (document.body.classList.contains("editing") || e.target === askInput) return;
+  if (document.body.classList.contains("editing") || e.target === askInput || e.target.closest?.("#refs")) return;
   if (!isOpen()) return;
   if (e.key === "Escape") return cancel();
   if (e.key === "Enter") { e.preventDefault(); return save(); }
@@ -726,28 +683,83 @@ askInput.addEventListener("keydown", (e) => {
   const query = askInput.value.trim();
   askInput.value = "";
   askInput.blur();
-  askFor(query);
+  askFor(query, !e.shiftKey);
 });
 askedEl.addEventListener("mousedown", (e) => { e.preventDefault(); clearPrompt(); });
 
-$("edit").addEventListener("click", () => {
+/** The plain editor for pasting or typing the text. Leaving it empty brings back the start screen. */
+function setEditing(on) {
   const editor = $("editor");
-  if (document.body.classList.toggle("editing")) {
-    forget(); editor.value = text; editor.focus(); $("edit").textContent = "done";
+  document.body.classList.toggle("editing", on);
+  $("edit").textContent = on ? "done" : "edit text";
+  if (on) {
+    forget();
+    editor.value = text;
+    editor.focus();
   } else {
-    text = editor.value.trim() || SAMPLE; changes = 0;
-    $("edit").textContent = "edit text";
+    text = editor.value.trim();
+    changes = 0;
     render();
   }
+}
+
+$("edit").addEventListener("click", () => setEditing(!document.body.classList.contains("editing")));
+$("startOwn").addEventListener("click", () => setEditing(true));
+$("startSample").addEventListener("click", () => { text = SAMPLE; render(); });
+const keyDialog = $("keyDialog");
+$("live").addEventListener("click", () => {
+  $("keyInput").value = settings.apiKey;
+  $("modelInput").value = settings.model;
+  keyDialog.returnValue = "";
+  keyDialog.showModal();
 });
+keyDialog.addEventListener("close", () => {
+  if (keyDialog.returnValue === "save") settings.save({ apiKey: $("keyInput").value, model: $("modelInput").value });
+  if (keyDialog.returnValue === "remove") settings.save({ apiKey: "", model: "" });
+  renderLive();
+});
+renderLive();
+function renderLive() { $("live").textContent = isLive() ? `live · ${settings.model}` : "simulator · add key"; }
+
 $("sound").addEventListener("click", () => { sound.toggle(); renderSound(); });
 renderSound();
 function renderSound() { $("sound").textContent = sound.muted ? "sound off" : "sound on"; }
 
 function renderPanel() {
   const pinned = new Set(seg?.pins.filter((p) => p.kind === "ref").map((p) => p.text) ?? []);
-  for (const p of refsEl.querySelectorAll("p")) p.classList.toggle("pinned", pinned.has(DOCS[+p.dataset.doc].paragraphs[+p.dataset.para]));
+  for (const p of refsEl.querySelectorAll(".doc p")) p.classList.toggle("pinned", pinned.has(p.textContent));
 }
+
+/* ---------- your documents ---------- */
+
+$("documents").addEventListener("click", () => refsEl.classList.toggle("show"));
+$("refsClose").addEventListener("click", () => refsEl.classList.remove("show"));
+
+$("docs").addEventListener("click", (e) => {
+  const button = e.target.closest(".remove");
+  if (!button) return;
+  if (!button.classList.contains("armed")) {
+    button.classList.add("armed");
+    button.textContent = "delete?";
+    return;
+  }
+  const doc = documents.all[+button.dataset.doc];
+  if (seg) seg.pins = seg.pins.filter((p) => p.doc !== doc);
+  documents.remove(+button.dataset.doc);
+  buildDocs();
+  if (seg) refreshPreview();
+});
+
+const docForm = $("docForm");
+$("docAdd").addEventListener("click", () => { docForm.hidden = false; $("docAdd").hidden = true; $("docTitle").focus(); });
+$("docCancel").addEventListener("click", closeDocForm);
+docForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!documents.add($("docTitle").value, $("docBody").value)) return toast("paste or type some text first");
+  buildDocs();
+  closeDocForm();
+});
+function closeDocForm() { docForm.reset(); docForm.hidden = true; $("docAdd").hidden = false; }
 
 /* ---------- drawing ---------- */
 
@@ -933,7 +945,10 @@ function drawPins(time) {
     else ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.strokeRect(p.x - size, p.y - size, size * 2, size * 2);
-    if (p.kind === "ref") continue;
+    if (p.kind === "ref") {
+      if (refsT < 0.5) { ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillText(hovered ? "× remove" : p.doc.title, p.x - 12, p.y + 3); ctx.textAlign = "center"; }
+      continue;
+    }
     ctx.fillStyle = "rgba(255,255,255,0.55)";
     const label = p.partner ? `${p.dir.label} + ${p.partner.label}` : p.dir.label;
     ctx.fillText(hovered ? "× remove" : `${label} ${"■".repeat(p.level)}`, p.x, p.y + size + 14);
@@ -1068,6 +1083,3 @@ function diffWords(a, b, removed = false) {
 }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
-</script>
-</body>
-</html>
