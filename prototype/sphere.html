@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sphere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #000; --fg: #fff; --mid: #8a8a8a; --low: #444; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden; }
+  body { font: 400 16px/1.9 var(--mono); -webkit-font-smoothing: antialiased; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  @media (max-width: 860px) { body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; overflow: auto; } }
+  button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+
+  #top { position: fixed; top: 18px; left: 24px; right: 24px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mid); z-index: 5; pointer-events: none; }
+  #top > * { pointer-events: auto; }
+  #top b { color: var(--fg); font-weight: 500; }
+  #top button { color: var(--mid); margin-left: 18px; }
+  #top button:hover { color: var(--fg); }
+
+  #left { display: grid; align-content: center; padding: 72px 28px 40px max(28px, 6vw); }
+  #text { white-space: pre-wrap; max-width: 46ch; }
+  #text::selection, #text *::selection { background: #fff; color: #000; }
+  .seg { cursor: pointer; text-decoration: underline dotted var(--mid); text-underline-offset: 4px; }
+  .seg .new { text-decoration: underline; text-decoration-color: var(--fg); text-underline-offset: 4px; }
+  .seg.focus { background: var(--fg); color: var(--bg); text-decoration: none; }
+  .seg.focus .new { text-decoration-color: var(--bg); text-decoration-thickness: 2px; }
+  .seg.preview .new { text-decoration-style: dashed; }
+  .seg.waiting { opacity: .55; }
+  #mix { margin-top: 28px; font-size: 13px; min-height: 1.9em; }
+  #help { margin-top: 6px; font-size: 12px; color: var(--mid); line-height: 1.8; max-width: 52ch; }
+  #help b { color: var(--fg); font-weight: 500; }
+  #own { display: none; margin-top: 10px; font-size: 14px; gap: 1ch; }
+  #own.show { display: flex; }
+  #own input { flex: 1; font: inherit; color: var(--fg); background: none; border: none; outline: none; }
+  #toast { position: fixed; bottom: 18px; left: 24px; color: #ff8f73; font-size: 12px; }
+  #editor { width: 100%; max-width: 46ch; min-height: 40vh; font: inherit; color: var(--fg); background: none; border: 1px solid var(--low); padding: 14px; outline: none; resize: vertical; display: none; }
+  body.editing #editor { display: block; }
+  body.editing #text, body.editing #mix, body.editing #help { display: none; }
+
+  #right { position: relative; min-height: 420px; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+  canvas.over { cursor: pointer; }
+  canvas.pulling, canvas.rolling { cursor: grabbing; }
+</style>
+</head>
+<body>
+<div id="top"><span id="status"><b>feeling</b></span><span><button id="sound"></button><button id="edit">edit text</button></span></div>
+<section id="left">
+  <div id="text"></div>
+  <textarea id="editor" spellcheck="false"></textarea>
+  <div id="mix"></div>
+  <div id="own"><span>&gt; your own:</span><input id="ownInput" maxlength="40" /></div>
+  <div id="help"></div>
+</section>
+<section id="right"><canvas id="sphere"></canvas></section>
+<div id="toast"></div>
+
+<script>
+const SAMPLE = "For three years I have built data tools for a small research team. I think I could help your company, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.";
+const LEVELS = ["", "slight", "medium", "strong"];
+const MOODS_PER_PASSAGE = 7;
+const MAX_MOODS = 8;
+const POINTS = 4200;
+const PEAK = 0.17;
+const SPREAD = 0.42;
+const PULL_STEP = 38;
+const CAMERA = 4.2, FOCAL = 3.2;
+
+const $ = (id) => document.getElementById(id);
+const textEl = $("text"), mixEl = $("mix"), helpEl = $("help"), statusEl = $("status"), toastEl = $("toast"), ownEl = $("own"), ownInput = $("ownInput");
+const canvas = $("sphere"), ctx = canvas.getContext("2d");
+
+let pieces = [{ kind: "plain", text: SAMPLE }];
+let segs = {};
+let nextId = 1;
+let focusId = null;
+let blendTimer = null, blendToken = 0;
+
+const base = fibonacci(POINTS);
+const phase = base.map(() => Math.random() * Math.PI * 2);
+let moodCenters = [];
+let weights = null;
+let shown = [];
+let yaw = 0.6, pitch = -0.25, spin = 0.0016;
+let W = 0, H = 0, R = 1, CX = 0, CY = 0, dpr = 1;
+let mouse = null;
+let hover = -1;
+let pull = null, roll = null;
+let lastMoveAt = 0;
+const ripples = [];
+const sound = createSound();
+
+resize();
+addEventListener("resize", resize);
+render();
+requestAnimationFrame(frame);
+
+function focused() { return focusId != null ? segs[focusId] : null; }
+function pieceText(p) { return p.kind === "plain" ? p.text : segs[p.id].current; }
+
+function render() { renderText(); renderSide(); }
+
+function renderText() {
+  textEl.innerHTML = "";
+  const previewing = previewText();
+  pieces.forEach((p, i) => {
+    const span = document.createElement("span");
+    span.dataset.p = i;
+    if (p.kind === "plain") { span.textContent = p.text; textEl.append(span); return; }
+    const seg = segs[p.id];
+    const isFocus = seg.id === focusId;
+    const text = isFocus && previewing != null ? previewing : seg.current;
+    span.className = "seg" + (isFocus ? " focus" : "") + (isFocus && previewing != null ? " preview" : "") + (seg.waiting ? " waiting" : "");
+    span.dataset.seg = seg.id;
+    for (const part of diffWords(seg.original, text)) {
+      const w = document.createElement("span");
+      if (part.changed) w.className = "new";
+      w.textContent = part.text;
+      span.append(w);
+    }
+    textEl.append(span);
+  });
+}
+
+function renderSide() {
+  const seg = focused();
+  const shaped = Object.values(segs).filter((s) => s.current !== s.original).length;
+  statusEl.innerHTML = `<b>feeling</b>${shaped ? `  ·  ${shaped} passage${shaped > 1 ? "s" : ""} shaped` : ""}`;
+  if (!seg) {
+    mixEl.textContent = "";
+    helpEl.innerHTML = "select some words to wake the sphere<br>click a shaped passage to change it again";
+    return;
+  }
+  const mix = seg.directions ? seg.directions.map((d, i) => (seg.levels[i] ? `${d.label} ${"■".repeat(seg.levels[i])}${"□".repeat(3 - seg.levels[i])}` : null)).filter(Boolean) : [];
+  mixEl.textContent = !seg.directions ? "reading the passage…" : mix.length ? mix.join("  +  ") : "unchanged";
+  helpEl.innerHTML = "<b>hover</b> a region to preview  ·  <b>press and pull outward</b> to strengthen, inward to soften<br><b>drag the space around</b> the sphere to roll it  ·  <b>scroll</b> on a region  ·  <b>/</b> your own  ·  <b>↵</b> keep  ·  <b>esc</b> undo";
+}
+
+function toast(message) {
+  toastEl.textContent = message;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (toastEl.textContent = ""), 4000);
+}
+
+textEl.addEventListener("mouseup", () => {
+  const sel = getSelection();
+  if (sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const a = pieceIndex(range.startContainer), b = pieceIndex(range.endContainer);
+  sel.removeAllRanges();
+  if (a == null || a !== b || pieces[a].kind !== "plain") return toast("select within plain text, not across a shaped passage");
+  const plain = pieces[a].text;
+  const [s, t] = snapToWords(plain, Math.min(range.startOffset, range.endOffset), Math.max(range.startOffset, range.endOffset));
+  if (t - s < 2) return;
+  keep();
+  const id = nextId++;
+  segs[id] = { id, original: plain.slice(s, t), current: plain.slice(s, t), directions: null, levels: [], saved: null };
+  pieces.splice(a, 1, ...[s > 0 && { kind: "plain", text: plain.slice(0, s) }, { kind: "seg", id }, t < plain.length && { kind: "plain", text: plain.slice(t) }].filter(Boolean));
+  open(segs[id]);
+  loadMoods(segs[id]);
+});
+
+textEl.addEventListener("click", (e) => {
+  const el = e.target.closest(".seg");
+  if (!el || +el.dataset.seg === focusId || !getSelection().isCollapsed) return;
+  keep();
+  open(segs[+el.dataset.seg]);
+});
+
+function open(seg) {
+  focusId = seg.id;
+  seg.saved = { levels: [...seg.levels], current: seg.current };
+  setMoods(seg.directions);
+  render();
+}
+
+function pieceIndex(node) {
+  const el = (node.nodeType === 3 ? node.parentElement : node).closest("[data-p]");
+  if (!el || !textEl.contains(el) || el.closest(".seg")) return null;
+  return +el.dataset.p;
+}
+
+function snapToWords(text, s, t) {
+  while (s > 0 && /\S/.test(text[s - 1])) s--;
+  while (t < text.length && /[^\s.,;:!?]/.test(text[t])) t++;
+  while (s < t && /\s/.test(text[s])) s++;
+  while (t > s && /\s/.test(text[t - 1])) t--;
+  return [s, t];
+}
+
+async function loadMoods(seg) {
+  try {
+    const { directions } = await api("bloom", { ...passageOf(seg), count: MOODS_PER_PASSAGE });
+    seg.directions = directions.map((d) => ({ ...d, kind: "suggested" }));
+    seg.levels = seg.directions.map(() => 0);
+  } catch (error) {
+    toast(error.message);
+    seg.directions = [];
+    seg.levels = [];
+  }
+  if (focusId === seg.id) { setMoods(seg.directions); faceMood(0); sound.wake(); }
+  render();
+}
+
+function passageOf(seg) {
+  let offset = 0;
+  for (const p of pieces) { if (p.kind === "seg" && p.id === seg.id) break; offset += pieceText(p).length; }
+  const text = pieces.map((p) => (p.kind === "seg" && p.id === seg.id ? seg.original : pieceText(p))).join("");
+  return { text, start: offset, end: offset + seg.original.length };
+}
+
+async function api(route, payload) {
+  const res = await fetch(`/api/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
+  return json;
+}
+
+function setLevel(seg, i, level) {
+  level = Math.max(0, Math.min(3, level));
+  if (seg.levels[i] === level) return;
+  seg.levels[i] = level;
+  sound.tick(level);
+  ripples.push({ m: i, born: performance.now() });
+  recompute(seg);
+}
+
+function recompute(seg) {
+  const active = seg.directions.map((d, i) => ({ d, level: seg.levels[i] })).filter((a) => a.level);
+  clearTimeout(blendTimer);
+  seg.waiting = false;
+  if (!active.length) seg.current = seg.original;
+  else if (active.length === 1) seg.current = active[0].d[LEVELS[active[0].level]];
+  else {
+    seg.waiting = true;
+    const token = ++blendToken;
+    blendTimer = setTimeout(async () => {
+      try {
+        const { text } = await api("blend", { ...passageOf(seg), pulls: active.map((a) => ({ label: a.d.label, weight: a.level / 3 })) });
+        if (token === blendToken) seg.current = text;
+      } catch (error) { toast(error.message); }
+      if (token === blendToken) { seg.waiting = false; render(); }
+    }, 180);
+  }
+  render();
+}
+
+function previewText() {
+  const seg = focused();
+  if (!seg?.directions || hover < 0 || pull || seg.levels[hover]) return null;
+  if (seg.levels.some(Boolean)) return null;
+  return seg.directions[hover].slight;
+}
+
+function keep() {
+  const seg = focused();
+  if (!seg) return;
+  focusId = null;
+  hover = -1;
+  if (seg.current === seg.original && !seg.levels.some(Boolean)) removeSeg(seg.id);
+  else if (seg.saved && seg.current !== seg.saved.current) sound.chime();
+  setMoods(null);
+  render();
+}
+
+function undo() {
+  const seg = focused();
+  if (!seg) return;
+  if (seg.saved) { seg.levels = [...seg.saved.levels]; seg.current = seg.saved.current; }
+  keep();
+}
+
+function removeSeg(id) {
+  const i = pieces.findIndex((p) => p.kind === "seg" && p.id === id);
+  if (i < 0) return;
+  pieces[i] = { kind: "plain", text: segs[id].current };
+  delete segs[id];
+  const merged = [];
+  for (const p of pieces) {
+    const last = merged[merged.length - 1];
+    if (p.kind === "plain" && last?.kind === "plain") last.text += p.text;
+    else merged.push({ ...p });
+  }
+  pieces = merged;
+}
+
+addEventListener("keydown", (e) => {
+  if (document.body.classList.contains("editing") || e.target === ownInput) return;
+  if (!focused()) return;
+  if (e.key === "Escape") return undo();
+  if (e.key === "Enter") { e.preventDefault(); return keep(); }
+  if (e.key === "/" && focused().directions) { e.preventDefault(); ownEl.classList.add("show"); ownInput.value = ""; ownInput.focus(); }
+});
+
+ownInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Escape") { ownEl.classList.remove("show"); return; }
+  if (e.key !== "Enter" || !ownInput.value.trim()) return;
+  const seg = focused(), label = ownInput.value.trim();
+  ownEl.classList.remove("show");
+  if (!seg?.directions) return;
+  try {
+    const { direction } = await api("custom", { ...passageOf(seg), label });
+    if (seg.directions.length >= MAX_MOODS) {
+      const free = seg.levels.findLastIndex((l) => !l);
+      const at = free >= 0 ? free : seg.directions.length - 1;
+      seg.directions.splice(at, 1); seg.levels.splice(at, 1);
+    }
+    seg.directions.push({ ...direction, kind: "custom" });
+    seg.levels.push(0);
+    setMoods(seg.directions);
+    faceMood(seg.directions.length - 1);
+  } catch (error) { toast(error.message); }
+  render();
+});
+
+$("edit").addEventListener("click", () => {
+  const editor = $("editor");
+  if (document.body.classList.toggle("editing")) {
+    keep(); editor.value = pieces.map(pieceText).join(""); editor.focus(); $("edit").textContent = "done";
+  } else {
+    pieces = [{ kind: "plain", text: editor.value.trim() || SAMPLE }];
+    segs = {}; focusId = null;
+    $("edit").textContent = "edit text";
+    render();
+  }
+});
+$("sound").addEventListener("click", () => { sound.toggle(); renderSound(); });
+renderSound();
+function renderSound() { $("sound").textContent = sound.muted ? "sound off" : "sound on"; }
+
+/* ---------- sphere ---------- */
+
+function setMoods(directions) {
+  const n = directions?.length ?? 0;
+  moodCenters = n ? fibonacci(n).map((p, i) => rotateAround(p, i)) : [];
+  weights = base.map((p) => moodCenters.map((c) => {
+    const theta = Math.acos(Math.max(-1, Math.min(1, dot(p, c))));
+    return Math.exp(-((theta / SPREAD) ** 2));
+  }));
+  shown = shown.slice(0, n);
+  while (shown.length < n) shown.push(0);
+  hover = -1;
+}
+
+function rotateAround([x, y, z], i) {
+  const a = 0.35;
+  return [x * Math.cos(a) + z * Math.sin(a), y, -x * Math.sin(a) + z * Math.cos(a)];
+}
+
+function faceMood(i) {
+  const c = moodCenters[i];
+  if (!c) return;
+  roll = null;
+  const targetYaw = -Math.atan2(c[0], c[2]);
+  const targetPitch = Math.max(-0.7, Math.min(0.7, Math.atan2(c[1], Math.hypot(c[0], c[2]))));
+  turnTo = { yaw: targetYaw, pitch: targetPitch };
+}
+let turnTo = null;
+
+function resize() {
+  dpr = devicePixelRatio || 1;
+  const box = canvas.getBoundingClientRect();
+  W = box.width; H = box.height;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  R = Math.min(W, H) * 0.32;
+  CX = W / 2; CY = H / 2;
+}
+
+function toCamera([x, y, z]) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+  const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+  return [x1, y2, z2];
+}
+
+function fromCamera([x, y, z]) {
+  const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const y1 = y * cp + z * sp, z1 = -y * sp + z * cp;
+  return [x * cy - z1 * sy, y1, x * sy + z1 * cy];
+}
+
+function project([x, y, z]) {
+  const s = FOCAL / (CAMERA - z);
+  return { x: CX + x * s * R, y: CY - y * s * R, s, z };
+}
+
+function hitSphere(px, py) {
+  const u = (px - CX) / R / FOCAL, v = -(py - CY) / R / FOCAL;
+  const d = normalize([u, v, -1]);
+  const o = [0, 0, CAMERA];
+  const b = dot(o, d), c = dot(o, o) - 1.05 * 1.05;
+  const disc = b * b - c;
+  if (disc < 0) return null;
+  const t = -b - Math.sqrt(disc);
+  return normalize(fromCamera([o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t]));
+}
+
+function nearestMood(p) {
+  let best = -1, bestDot = Math.cos(0.62);
+  moodCenters.forEach((c, i) => { const d = dot(p, c); if (d > bestDot) { bestDot = d; best = i; } });
+  return best;
+}
+
+canvas.addEventListener("mousemove", (e) => {
+  const box = canvas.getBoundingClientRect();
+  mouse = { x: e.clientX - box.left, y: e.clientY - box.top };
+  lastMoveAt = performance.now();
+  if (pull || roll) return;
+  const p = hitSphere(mouse.x, mouse.y);
+  const h = p && focused()?.directions ? nearestMood(p) : -1;
+  if (h !== hover) {
+    hover = h;
+    if (h >= 0) sound.hover(h);
+    renderText();
+  }
+  canvas.classList.toggle("over", hover >= 0);
+});
+canvas.addEventListener("mouseleave", () => { mouse = null; if (!pull && !roll && hover !== -1) { hover = -1; renderText(); } });
+
+canvas.addEventListener("mousedown", (e) => {
+  sound.wake();
+  const seg = focused();
+  if (hover >= 0 && seg?.directions) {
+    const c = project(toCamera(moodCenters[hover]));
+    const out = normalize2(c.x - CX, c.y - CY);
+    pull = { m: hover, x: e.clientX, y: e.clientY, out, start: seg.levels[hover] };
+    canvas.classList.add("pulling");
+  } else {
+    roll = { x: e.clientX, y: e.clientY, yaw, pitch };
+    turnTo = null;
+    canvas.classList.add("rolling");
+  }
+});
+
+addEventListener("mousemove", (e) => {
+  if (roll) {
+    yaw = roll.yaw + (e.clientX - roll.x) * 0.008;
+    pitch = Math.max(-0.9, Math.min(0.9, roll.pitch + (e.clientY - roll.y) * 0.006));
+  }
+  if (pull) {
+    const seg = focused();
+    if (!seg) return;
+    const along = (e.clientX - pull.x) * pull.out[0] + (e.clientY - pull.y) * pull.out[1];
+    setLevel(seg, pull.m, pull.start + Math.round(along / PULL_STEP));
+  }
+});
+
+addEventListener("mouseup", () => {
+  if (pull || roll) { pull = null; roll = null; canvas.classList.remove("pulling", "rolling"); renderText(); }
+});
+
+canvas.addEventListener("wheel", (e) => {
+  const seg = focused();
+  if (hover < 0 || !seg?.directions) return;
+  e.preventDefault();
+  setLevel(seg, hover, seg.levels[hover] + (e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+
+function frame(t) {
+  const time = t / 1000;
+  const seg = focused();
+  const levels = seg?.levels ?? [];
+  shown = shown.map((v, i) => v + ((levels[i] ?? 0) - v) * 0.12);
+  if (turnTo) {
+    yaw += angleDelta(yaw, turnTo.yaw) * 0.08;
+    pitch += (turnTo.pitch - pitch) * 0.08;
+    if (Math.abs(angleDelta(yaw, turnTo.yaw)) < 0.002) turnTo = null;
+  } else if (!roll && !pull && hover < 0 && performance.now() - lastMoveAt > 1500) yaw += spin;
+
+  ctx.clearRect(0, 0, W, H);
+  drawShells(seg);
+
+  const now = performance.now();
+  const awake = !!seg?.directions?.length;
+  const cursorHit = mouse && !roll ? hitSphere(mouse.x, mouse.y) : null;
+  for (let i = 0; i < POINTS; i++) {
+    const p = base[i];
+    let h = 0.012 * Math.sin(time * 1.3 + phase[i]);
+    let glow = 0;
+    if (weights) {
+      const w = weights[i];
+      for (let m = 0; m < w.length; m++) {
+        h += shown[m] * PEAK * w[m];
+        glow += (shown[m] / 3) * w[m];
+        if (m === hover) glow += 0.35 * w[m];
+      }
+      for (const r of ripples) {
+        const age = (now - r.born) / 700;
+        if (age < 1) h += 0.05 * Math.sin(age * 9 - (1 - (w[r.m] ?? 0)) * 6) * (1 - age) * (w[r.m] ?? 0);
+      }
+    }
+    if (cursorHit) {
+      const d = 1 - dot(p, cursorHit);
+      if (d < 0.06) h += 0.06 * (1 - d / 0.06) * (0.6 + 0.4 * Math.sin(time * 6 + phase[i]));
+    }
+    const r = 1 + h;
+    const cam = toCamera([p[0] * r, p[1] * r, p[2] * r]);
+    const s = project(cam);
+    const facing = (cam[2] / r + 1) / 2;
+    const alpha = (awake ? 0.18 : 0.14) + facing * (awake ? 0.72 : 0.55) + Math.min(0.5, glow * 0.7);
+    const size = (1.3 + facing * 1.4 + Math.min(1.8, glow * 2)) * s.s * 0.42;
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, alpha)})`;
+    ctx.fillRect(s.x - size / 2, s.y - size / 2, size, size);
+  }
+  for (let i = ripples.length - 1; i >= 0; i--) if (now - ripples[i].born > 700) ripples.splice(i, 1);
+
+  drawLabels(seg);
+  requestAnimationFrame(frame);
+}
+
+function drawShells(seg) {
+  if (!seg?.directions?.length) return;
+  const active = pull != null || hover >= 0;
+  const s = FOCAL / CAMERA;
+  for (let k = 1; k <= 3; k++) {
+    const rr = (1 + PEAK * k) * s * R;
+    ctx.strokeStyle = `rgba(255,255,255,${active ? 0.1 : 0.04})`;
+    ctx.setLineDash([2, 5]);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(CX, CY, rr, 0, Math.PI * 2); ctx.stroke();
+    if (active) {
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      ctx.font = "400 10px 'IBM Plex Mono', monospace";
+      ctx.textAlign = "left";
+      const a = -0.35 - k * 0.16;
+      ctx.fillText(LEVELS[k], CX + Math.cos(a) * rr + 6, CY + Math.sin(a) * rr);
+    }
+  }
+  ctx.setLineDash([]);
+}
+
+function drawLabels(seg) {
+  if (!seg?.directions) {
+    if (seg) {
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "400 12px 'IBM Plex Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("reading the passage…", CX, CY + R * 1.55);
+    }
+    return;
+  }
+  ctx.textAlign = "center";
+  moodCenters.forEach((c, m) => {
+    const lift = 1 + shown[m] * PEAK + 0.2;
+    const cam = toCamera([c[0] * lift, c[1] * lift, c[2] * lift]);
+    const facing = cam[2] / lift;
+    if (facing < -0.15 && m !== hover) return;
+    const s = project(cam);
+    const level = seg.levels[m] ?? 0;
+    const isHover = m === hover || pull?.m === m;
+    const alpha = isHover ? 1 : Math.max(0, 0.18 + 0.5 * facing) + (level ? 0.25 : 0);
+    ctx.font = `${isHover ? 500 : 400} ${isHover ? 13 : 11.5}px 'IBM Plex Mono', monospace`;
+    const label = seg.directions[m].label;
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    const width = ctx.measureText(label).width;
+    ctx.fillRect(s.x - width / 2 - 5, s.y - 14, width + 10, level || isHover ? 34 : 19);
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(1, alpha)})`;
+    ctx.fillText(label, s.x, s.y);
+    if (level || isHover) {
+      ctx.font = "400 11px 'IBM Plex Mono', monospace";
+      ctx.fillText("■".repeat(level) + "□".repeat(3 - level), s.x, s.y + 15);
+    }
+  });
+}
+
+function createSound() {
+  let ac = null, out = null, muted = false;
+  try { muted = localStorage.getItem("feeling-sound") === "off"; } catch {}
+  function ready() {
+    if (muted) return false;
+    if (!ac) { ac = new AudioContext(); out = ac.createGain(); out.gain.value = 0.7; out.connect(ac.destination); }
+    ac.resume();
+    return true;
+  }
+  function blip(freq, peak, length, delay = 0, type = "sine") {
+    if (!ac || !ready()) return;
+    const osc = ac.createOscillator(), gain = ac.createGain(), at = ac.currentTime + delay;
+    osc.type = type; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, at); gain.gain.linearRampToValueAtTime(peak, at + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+    osc.connect(gain).connect(out); osc.start(at); osc.stop(at + length + 0.05);
+  }
+  const scale = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
+  return {
+    get muted() { return muted; },
+    wake: () => ready(),
+    hover: (m) => blip(scale[m % scale.length], 0.025, 0.35),
+    tick: (level) => blip(level ? 440 * 2 ** ((level * 4) / 12) : 330, 0.05, 0.09, 0, "triangle"),
+    chime: () => { blip(659.25, 0.05, 0.5); blip(987.77, 0.04, 0.8, 0.08); },
+    toggle() { muted = !muted; try { localStorage.setItem("feeling-sound", muted ? "off" : "on"); } catch {} },
+  };
+}
+
+function fibonacci(n) {
+  const out = [], golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (2 * (i + 0.5)) / n, r = Math.sqrt(1 - y * y), a = i * golden;
+    out.push([Math.cos(a) * r, y, Math.sin(a) * r]);
+  }
+  return out;
+}
+function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function normalize(v) { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); }
+function normalize2(x, y) { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; }
+function angleDelta(a, b) { return Math.atan2(Math.sin(b - a), Math.cos(b - a)); }
+
+function diffWords(a, b) {
+  const A = a.split(/(\s+)/), B = b.split(/(\s+)/);
+  const n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0;
+  while (j < m) {
+    if (i < n && A[i] === B[j]) { out.push({ text: B[j], changed: false }); i++; j++; }
+    else if (i < n && L[i + 1][j] >= L[i][j + 1]) i++;
+    else { out.push({ text: B[j], changed: /\S/.test(B[j]) }); j++; }
+  }
+  return out;
+}
+</script>
+</body>
+</html>

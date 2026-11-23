@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Style options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9e7e2; font-family: "Inter", system-ui, sans-serif; color: #222; }
+  header { padding: 36px 40px 8px; max-width: 1240px; margin: 0 auto; }
+  header h1 { font: 500 20px "Inter", sans-serif; margin: 0 0 6px; }
+  header p { margin: 0; color: #555; font-size: 14px; line-height: 1.5; max-width: 760px; }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(540px, 1fr)); gap: 28px; padding: 24px 40px 60px; max-width: 1240px; margin: 0 auto; }
+  @media (max-width: 640px) { main { grid-template-columns: 1fr; padding: 16px; } header { padding: 24px 16px 0; } }
+  figure { margin: 0; }
+  figcaption { font-size: 13px; color: #444; margin: 10px 2px 0; line-height: 1.5; }
+  figcaption b { font-weight: 500; color: #111; }
+  .frame { border-radius: 10px; overflow: hidden; min-height: 330px; padding: 44px 44px 36px; position: relative; box-shadow: 0 1px 0 rgba(0,0,0,.06), 0 10px 30px rgba(0,0,0,.08); }
+  .tag { position: absolute; top: 14px; left: 16px; font: 500 11px "IBM Plex Mono", monospace; letter-spacing: .1em; opacity: .5; }
+
+  /* A — paper, margin steering */
+  .a { background: #f7f4ee; color: #1d1b18; display: grid; grid-template-columns: 150px 1fr; gap: 28px; }
+  .a p { font: 400 19px/1.75 "Newsreader", serif; margin: 0; }
+  .a .pass { background: linear-gradient(transparent 62%, #f1dfae 62%); }
+  .a .new { color: #9a5b00; }
+  .a .rail { font: 400 12px/1 "Inter", sans-serif; display: grid; gap: 14px; align-content: start; padding-top: 52px; border-right: 1px solid #e2ddd2; padding-right: 18px; }
+  .a .rail div { display: flex; justify-content: space-between; color: #8a857b; }
+  .a .rail .on { color: #1d1b18; font-weight: 500; }
+  .meter { letter-spacing: 2px; color: #c9a55a; }
+
+  /* B — terminal, Spaceship-like */
+  .b { background: #000; color: #fff; font: 400 15px/1.9 "IBM Plex Mono", monospace; }
+  .b p { margin: 0; }
+  .b .pass { background: #fff; color: #000; padding: 1px 3px; }
+  .b .new { text-decoration: underline; text-underline-offset: 3px; }
+  .b .menu { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: #888; }
+  .b .menu .on { color: #fff; }
+
+  /* C — ghost line under the passage */
+  .c { background: #ffffff; color: #202124; }
+  .c p { font: 400 19px/1.8 "Newsreader", serif; margin: 0; }
+  .c .old { color: #9aa0a6; text-decoration: line-through; text-decoration-color: #c4c7cb; }
+  .c .alt { display: block; margin: 4px 0 6px; padding: 8px 12px; border-left: 2px solid #3b6fd8; background: #f3f6fd; font-style: italic; color: #1a3d8f; }
+  .c .chips { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .c .chip { font: 400 12.5px "Inter", sans-serif; border: 1px solid #dadce0; border-radius: 999px; padding: 6px 12px; color: #5f6368; display: inline-flex; gap: 8px; align-items: center; }
+  .c .chip.on { border-color: #3b6fd8; color: #1a3d8f; background: #eef3fd; }
+  .c .bars { display: inline-flex; gap: 2px; }
+  .c .bars i { width: 4px; height: 10px; border-radius: 1px; background: #dadce0; }
+  .c .chip.on .bars i.f { background: #3b6fd8; }
+
+  /* D — dark, crisp, dial in the margin */
+  .d { background: #101114; color: #f2f0ea; display: grid; grid-template-columns: 1fr 120px; gap: 28px; }
+  .d p { font: 400 19px/1.8 "Newsreader", serif; margin: 0; }
+  .d .new { color: #f0c96f; }
+  .d .pass { border-bottom: 1px solid #f0c96f; }
+  .d .dial { align-self: center; justify-self: center; }
+  .d .dial-label { font: 400 11px "IBM Plex Mono", monospace; color: #b9b6ae; text-align: center; margin-top: 10px; letter-spacing: .05em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Four looks for the same moment</h1>
+  <p>Each panel shows the same instant: you're steering “I think I could help your company” toward <i>quietly confident</i> at <i>medium</i> strength. Nothing is drawn on top of the text in any of them. Tell me which one feels closest. You can also mix them, for example “A's colours with C's chips”.</p>
+</header>
+<main>
+  <figure>
+    <div class="frame a">
+      <span class="tag">A</span>
+      <div class="rail">
+        <div class="on"><span>confident</span><span class="meter">●●○</span></div>
+        <div><span>warmer</span><span class="meter">○○○</span></div>
+        <div><span>about the team</span><span class="meter">○○○</span></div>
+        <div><span>more curious</span><span class="meter">○○○</span></div>
+      </div>
+      <p>For three years I have built data tools for a small research team. <span class="pass"><span class="new">I can</span> help your company</span>, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.</p>
+    </div>
+    <figcaption><b>A · Paper and margin.</b> Warm paper, dark ink, a soft highlighter on the passage. The directions sit in a quiet column beside the text, each with a three-dot strength meter. Calm and very readable, like a writing app.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame b">
+      <span class="tag">B</span>
+      <p>For three years I have built data tools for a small research team. <span class="pass"><span class="new">I can</span> help your company</span>, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.</p>
+      <div class="menu"><span class="on">[1] confident ■■□</span><span>[2] warmer □□□</span><span>[3] about the team □□□</span><span>[4] more curious □□□</span></div>
+    </div>
+    <figcaption><b>B · Terminal.</b> Pure black and white, one monospace font, maximum contrast, close to Spaceship's look. The passage turns into an inverted block, and the directions are a plain row of keys underneath.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame c">
+      <span class="tag">C</span>
+      <p>For three years I have built data tools for a small research team. <span class="old">I think I could help your company</span><span class="alt">I can help your company,</span>because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.</p>
+      <div class="chips">
+        <span class="chip on">confident <span class="bars"><i class="f"></i><i class="f"></i><i></i></span></span>
+        <span class="chip">warmer <span class="bars"><i></i><i></i><i></i></span></span>
+        <span class="chip">about the team <span class="bars"><i></i><i></i><i></i></span></span>
+        <span class="chip">more curious <span class="bars"><i></i><i></i><i></i></span></span>
+      </div>
+    </div>
+    <figcaption><b>C · Before and after.</b> Clean white, like a document editor. The new version appears as a separate line right under the old one, which is faintly crossed out, so you compare them directly. The directions are chips with strength bars.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame d">
+      <span class="tag">D</span>
+      <p>For three years I have built data tools for a small research team. <span class="pass"><span class="new">I can</span> help your company</span>, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.</p>
+      <div>
+        <svg class="dial" width="120" height="120" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r="16" fill="none" stroke="#3a3b40" />
+          <circle cx="60" cy="60" r="32" fill="none" stroke="#f0c96f" stroke-opacity=".7" />
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#3a3b40" />
+          <line x1="60" y1="60" x2="83" y2="37" stroke="#f0c96f" stroke-width="1.5" />
+          <circle cx="83" cy="37" r="4" fill="#f0c96f" />
+          <circle cx="94" cy="26" r="3" fill="none" stroke="#f0c96f" />
+          <circle cx="94" cy="94" r="3" fill="none" stroke="#6b6a66" />
+          <circle cx="26" cy="94" r="3" fill="none" stroke="#6b6a66" />
+          <circle cx="26" cy="26" r="3" fill="none" stroke="#6b6a66" />
+        </svg>
+        <div class="dial-label">confident · medium</div>
+      </div>
+    </div>
+    <figcaption><b>D · Dark, but crisp.</b> Keeps the night feel, but with full-strength text that never fades. The compass shrinks to a small dial in the margin next to the line you're editing, instead of covering the paragraph.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

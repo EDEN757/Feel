@@ -1,0 +1,992 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #000; --fg: #fff; --mid: #8a8a8a; --low: #444; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; --panel: 330px; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 400 16px/1.9 var(--mono); -webkit-font-smoothing: antialiased; }
+  body.open { cursor: none; }
+  button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; z-index: 4; }
+
+  #top { position: fixed; top: 0; left: 0; right: 0; padding: 18px 24px 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mid); z-index: 3; transition: opacity .3s; background: linear-gradient(#000 60%, transparent); }
+  #top b { color: var(--fg); font-weight: 500; }
+  #top button { color: var(--mid); margin-left: 18px; }
+  #top button:hover { color: var(--fg); }
+  body.open #top { opacity: 0; pointer-events: none; }
+
+  #text { position: relative; margin: 0 auto; padding: 22vh 0 45vh; width: min(46ch, 80vw); white-space: pre-wrap; z-index: 2; cursor: text; }
+  #text::selection, #text *::selection { background: #fff; color: #000; }
+  body.open #text { user-select: none; pointer-events: none; }
+  #text > span { transition: color .3s; }
+  body.open #text > span:not(.seg):not(.ghost) { color: #555; }
+  .seg { text-decoration: underline dotted var(--mid); text-underline-offset: 5px; }
+  .seg .new { background: var(--fg); color: var(--bg); }
+  .seg .doomed { background: var(--fg); color: var(--bg); }
+  .seg .born { animation: born .7s ease-out; }
+  .seg.waiting .new, .ghost.waiting { animation: think 0.9s ease-in-out infinite; }
+  .seg.fading { text-decoration: none; }
+  .seg.fading .new { animation: afterglow 1.6s ease-out forwards; }
+  .ghost { color: #b5b5b5; text-decoration: underline dotted #666; text-underline-offset: 5px; }
+  .ghost.fading { animation: settle 1.6s ease-out forwards; text-decoration: none; }
+  .caret { display: inline-block; width: .55em; height: 1.05em; vertical-align: -0.18em; background: var(--fg); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes afterglow { 0%, 35% { background: var(--fg); color: var(--bg); } 100% { background: transparent; color: var(--fg); } }
+  @keyframes settle { 0%, 30% { color: var(--bg); background: var(--fg); } 100% { color: var(--fg); background: transparent; } }
+  @keyframes born { from { background: var(--fg); color: var(--bg); } to { background: transparent; } }
+  @keyframes think { 50% { background: #777; } }
+
+  #refs { position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel); z-index: 5; background: #050505; border-left: 1px solid #222; padding: 70px 22px 80px; overflow-y: auto;
+    transform: translateX(100%); transition: transform .45s cubic-bezier(.2,.7,.1,1); font-size: 12.5px; line-height: 1.7; cursor: default; }
+  #refs.show { transform: none; }
+  #refs h2 { font: 500 11px var(--mono); letter-spacing: .12em; color: var(--mid); margin: 0 0 18px; text-transform: uppercase; }
+  .doc { margin-bottom: 22px; }
+  .doc h3 { font: 500 12.5px var(--mono); margin: 0 0 6px; }
+  .doc p { margin: 0 0 6px; color: #9a9a9a; padding: 4px 6px; margin-left: -6px; border-radius: 2px; cursor: crosshair; transition: background .15s, color .15s; }
+  .doc p:hover { background: #151515; color: var(--fg); }
+  .doc p.pinned { background: var(--fg); color: var(--bg); }
+  #refsTab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); writing-mode: vertical-rl; font-size: 11px; letter-spacing: .14em; color: var(--mid);
+    padding: 14px 6px; border-left: 1px solid #333; z-index: 5; display: none; pointer-events: none; }
+  body.open #refsTab { display: block; }
+  #refs.show ~ #refsTab { display: none; }
+
+  #hint { position: fixed; bottom: 0; left: 0; right: 0; padding: 34px 4vw 16px; text-align: center; font-size: 12px; color: var(--mid); z-index: 3; pointer-events: none; background: linear-gradient(transparent, #000 55%); }
+  #hint b { color: var(--fg); font-weight: 500; }
+  #meter { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); font-size: 12px; z-index: 6; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #meter.show { opacity: 1; }
+  #own { position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%); display: none; gap: 1ch; font-size: 14px; z-index: 6; }
+  #own.show { display: flex; }
+  #own input { width: 30ch; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid var(--mid); outline: none; }
+  #toast { position: fixed; bottom: 48px; left: 24px; color: #ff8f73; font-size: 12px; z-index: 6; }
+  #editor { display: none; margin: 18vh auto 0; width: min(46ch, 80vw); min-height: 60vh; font: inherit; color: var(--fg); background: none; border: 1px solid var(--low); padding: 14px; outline: none; resize: vertical; }
+  body.editing #editor { display: block; }
+  body.editing #text { display: none; }
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+<div id="top"><span id="status"><b>feeling</b></span><span><button id="sound"></button><button id="edit">edit text</button></span></div>
+<div id="text"></div>
+<textarea id="editor" spellcheck="false"></textarea>
+<aside id="refs"><h2>your documents · click a passage to reference it</h2><div id="docs"></div></aside>
+<div id="refsTab">references ›</div>
+<div id="meter"></div>
+<div id="own"><span>&gt; your own:</span><input id="ownInput" maxlength="60" /></div>
+<div id="hint"></div>
+<div id="toast"></div>
+
+<script>
+const SAMPLE = `Dear hiring team,
+
+For three years I have built data tools for a small research team at a university lab. I think I could help your company, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.
+
+Most of my work started with a messy question from a biologist or a policy researcher. I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app. I learned that the hardest part is rarely the code. It is understanding what people need before they can say it.
+
+Last year I built a pipeline that cut the time to prepare a dataset from two weeks to one afternoon. I am proud of it, but I think the part that mattered most was the documentation, because it meant the team could keep using it after I moved on.
+
+I am drawn to your company because you build tools for people who are not engineers. That is the kind of problem I enjoy, and I think my background, somewhere between research and software, would be useful for that work.
+
+I would be glad to talk about how I could help. Thank you for your time.
+
+Best regards,
+Alex`;
+
+/** Placeholder documents the writer made earlier; later these come from their own files. */
+const DOCS = [
+  { title: "thesis abstract", paragraphs: ["My master's thesis asked whether city sensor data could predict which streets flood first.", "I combined ten years of rainfall records with residents' complaints and reached 81% accuracy at street level."] },
+  { title: "pipeline notes", paragraphs: ["Ingestion pipeline in Python and DuckDB, replacing a manual spreadsheet process.", "Prep time went from two weeks to one afternoon; four teams now use it, onboarding docs included."] },
+  { title: "letter to Studio Nord", paragraphs: ["What draws me to small studios is seeing a tool used the week it ships.", "I like being close enough to users to hear what confuses them."] },
+  { title: "supervisor's feedback", paragraphs: ["Alex is the person everyone asks when a dataset stops making sense.", "Explains technical trade-offs to non-technical colleagues with unusual patience."] },
+];
+
+const NAMES = { edit: ["", "slight", "medium", "strong"], write: ["", "phrase", "sentence", "paragraph"] };
+const KEYS = ["", "slight", "medium", "strong"];
+const MEANINGS = 6, MAX_MEANINGS = 8;
+const INNER = 0.42, OUTER = 0.96;
+const BLEND_DEGREES = 7;
+const SCROLL_PAUSE = 450;
+const PANEL = 330, EDGE = 26;
+const COMBO_WINDOW = 320;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("screen"), ctx = canvas.getContext("2d");
+const textEl = $("text"), hintEl = $("hint"), statusEl = $("status"), toastEl = $("toast"), ownEl = $("own"), ownInput = $("ownInput");
+const refsEl = $("refs"), meterEl = $("meter");
+
+let W = 0, H = 0, RX = 0, RY = 0, CX = 0, CY = 0;
+let text = SAMPLE;
+let seg = null;
+let changes = 0;
+let mouse = { x: -1, y: -1 };
+let trail = [];
+let aim = null;
+let openT = 0, labelT = 0, refsT = 0;
+let glow = [];
+let flashes = [], planted = [], particles = [];
+let collapse = null;
+let scrollLock = 0;
+let downAt = null;
+const shrinkState = { pending: 0, combo: 0, lastAt: 0, timer: null, busy: false };
+const sound = createSound();
+
+buildDocs();
+resize();
+addEventListener("resize", resize);
+render();
+requestAnimationFrame(frame);
+
+function isOpen() { return !!seg && !seg.done && !!currentSet()?.length; }
+function currentSet() { return seg?.sets?.[seg.setIndex] ?? null; }
+function names() { return NAMES[seg?.mode ?? "edit"]; }
+
+function resize() {
+  const dpr = devicePixelRatio || 1;
+  W = innerWidth; H = innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  layoutRing();
+}
+
+/** The ring shrinks to the left while the references panel is out. */
+function layoutRing() {
+  const room = W - PANEL * easeOut(refsT);
+  CX = room / 2; CY = H / 2;
+  RX = room / 2 - Math.max(110, room * 0.1);
+  RY = H / 2 - 64;
+}
+
+function buildDocs() {
+  $("docs").innerHTML = DOCS.map((d, i) => `<div class="doc"><h3>${esc(d.title)}</h3>${d.paragraphs.map((p, j) => `<p data-doc="${i}" data-para="${j}">${esc(p)}</p>`).join("")}</div>`).join("");
+}
+
+function render() {
+  renderText();
+  statusEl.innerHTML = `<b>feeling</b>${changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : ""}`;
+  document.body.classList.toggle("open", isOpen());
+  const set = currentSet();
+  if (!seg || seg.done) hintEl.innerHTML = "<b>select</b> words to reshape them  ·  <b>click</b> between words to write there  ·  scroll to read";
+  else if (!set) hintEl.textContent = seg.mode === "write" ? "thinking about what could go here…" : "reading the passage…";
+  else {
+    const what = seg.mode === "write" ? "a move, further out writes more" : "a meaning, nearer the edge is stronger";
+    const pins = seg.pins.length ? ` (${seg.pins.length} pinned)` : "";
+    const arrows = seg.mode === "edit" ? " · <b>← ↓</b> shorter, tap fast for more · <b>→ ↑</b> back" : "";
+    hintEl.innerHTML = `<b>move</b> toward ${what} · <b>click</b> to pin${pins} · <b>↵</b> save${arrows}<br><b>scroll</b> ↓ new ${seg.mode === "write" ? "moves" : "meanings"} ↑ back (${seg.setIndex + 1}/${seg.sets.length}) · push the <b>right edge</b> for references · <b>/</b> your own · <b>esc</b> cancel`;
+  }
+  renderPanel();
+}
+
+function renderText() {
+  textEl.innerHTML = "";
+  if (!seg) { textEl.append(span(text)); return; }
+  const before = span(text.slice(0, seg.start)), after = span(text.slice(seg.end));
+  const mid = document.createElement("span");
+  if (seg.mode === "write") {
+    const shown = seg.preview ?? seg.current;
+    mid.className = "ghost" + (seg.waiting ? " waiting" : "") + (seg.done ? " fading" : "");
+    mid.textContent = shown;
+    if (!shown && !seg.done) mid.innerHTML = '<span class="caret"></span>';
+  } else {
+    mid.className = "seg" + (seg.waiting ? " waiting" : "") + (seg.done ? " fading" : "");
+    const parts = seg.doomedFrom ? diffWords(seg.original, seg.doomedFrom, true) : diffWords(seg.original, seg.preview ?? seg.current);
+    for (const part of parts) {
+      const w = span(part.text);
+      if (part.changed) w.className = seg.doomedFrom ? "doomed" : "new";
+      if (part.born) w.className = "born";
+      mid.append(w);
+    }
+  }
+  textEl.append(before, mid, after);
+}
+
+function span(t) { const s = document.createElement("span"); s.textContent = t; return s; }
+
+function toast(message) {
+  toastEl.textContent = message;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (toastEl.textContent = ""), 4000);
+}
+
+/* ---------- starting: select to edit, click to write ---------- */
+
+textEl.addEventListener("mousedown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
+
+textEl.addEventListener("mouseup", (e) => {
+  if (isOpen()) return;
+  if (seg?.waiting) { getSelection().removeAllRanges(); return toast("one moment, the last change is still being written"); }
+  const sel = getSelection();
+  const dragged = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4;
+  if (!sel.isCollapsed && dragged) {
+    const range = sel.getRangeAt(0);
+    if (!textEl.contains(range.commonAncestorContainer)) return;
+    const from = offsetOf(range.startContainer, range.startOffset), to = offsetOf(range.endContainer, range.endOffset);
+    sel.removeAllRanges();
+    forget();
+    const [s, t] = snapToWords(text, Math.min(from, to), Math.max(from, to));
+    if (t - s < 2) return render();
+    open({ mode: "edit", start: s, end: t, original: text.slice(s, t) });
+  } else if (!dragged) {
+    const caret = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (!caret || !textEl.contains(caret.startContainer)) return;
+    let at = offsetOf(caret.startContainer, caret.startOffset);
+    sel.removeAllRanges();
+    forget();
+    while (at < text.length && /[\w'’-]/.test(text[at])) at++;
+    while (at < text.length && /[.,;:!?)]/.test(text[at])) at++;
+    open({ mode: "write", start: at, end: at, original: "" });
+  }
+});
+
+function open(fields) {
+  seg = { ...fields, current: fields.original, preview: null, sets: [], setIndex: 0, pins: [], history: [] };
+  openT = 0;
+  sound.wake();
+  render();
+  centerOn(textEl.querySelector(".seg, .ghost"));
+  loadSet(seg);
+}
+
+function centerOn(el) {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  window.scrollBy({ top: r.top + r.height / 2 - innerHeight / 2, behavior: "smooth" });
+}
+
+function offsetOf(node, offset) {
+  const r = document.createRange();
+  r.setStart(textEl, 0);
+  r.setEnd(node, offset);
+  return r.toString().length;
+}
+
+function snapToWords(str, s, t) {
+  while (s > 0 && /\S/.test(str[s - 1])) s--;
+  while (t < str.length && /[^\s.,;:!?]/.test(str[t])) t++;
+  while (s < t && /\s/.test(str[s])) s++;
+  while (t > s && /\s/.test(str[t - 1])) t--;
+  return [s, t];
+}
+
+/** Writes the passage's current wording into the text and drops the selection, so the next selection can cover anything. */
+function forget() {
+  if (!seg) return;
+  clearTimeout(seg.fadeTimer);
+  if (seg.done) text = text.slice(0, seg.start) + seg.current + text.slice(seg.end);
+  seg = null;
+}
+
+async function loadSet(target) {
+  const seen = target.sets.flat().map((d) => d.label);
+  const custom = currentSet()?.filter((d) => d.kind === "custom") ?? [];
+  target.loading = true;
+  render();
+  try {
+    const route = target.mode === "write" ? "moves" : "bloom";
+    const { directions } = await api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: seen });
+    if (seg !== target) return;
+    target.sets.push([...directions.map((d) => ({ ...d, kind: "suggested" })), ...custom].slice(0, MAX_MEANINGS));
+    target.setIndex = target.sets.length - 1;
+    labelT = 0;
+    glow = [];
+  } catch (error) {
+    toast(error.message);
+    if (!target.sets.length && seg === target) seg = null;
+  }
+  target.loading = false;
+  render();
+}
+
+async function api(route, payload) {
+  const res = await fetch(`/api/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
+  return json;
+}
+
+/* ---------- aiming, pins and combining ---------- */
+
+function aimAt(x, y) {
+  const set = currentSet();
+  const n = set?.length ?? 0;
+  if (!n || overPanel(x)) return null;
+  const nx = (x - CX) / RX, ny = (y - CY) / RY;
+  const q = Math.hypot(nx, ny);
+  const u = (q - INNER) / (OUTER - INNER);
+  const level = u <= 0 ? 0 : u < 1 / 3 ? 1 : u < 2 / 3 ? 2 : 3;
+  let deg = (Math.atan2(ny, nx) * 180) / Math.PI + 90;
+  deg = ((deg % 360) + 360) % 360;
+  const span = 360 / n;
+  const index = Math.floor(deg / span) % n;
+  const within = deg - index * span;
+  let blendWith = null;
+  if (within < BLEND_DEGREES) blendWith = (index - 1 + n) % n;
+  else if (span - within < BLEND_DEGREES) blendWith = (index + 1) % n;
+  return { index, level, q, deg, blendWith: level ? blendWith : null };
+}
+
+function overPanel(x) { return refsT > 0.5 && x > W - PANEL; }
+
+function updateAim() {
+  if (!isOpen()) return;
+  const next = aimAt(mouse.x, mouse.y);
+  const same = (a, b) => (!a && !b) || (a && b && a.index === b.index && a.level === b.level && a.blendWith === b.blendWith);
+  if (next && aim && next.level && next.index !== aim.index) sound.meaning(next.index);
+  if (next && next.level !== (aim?.level ?? 0) && next.level) {
+    sound.tick(next.level);
+    flashes.push({ index: next.index, q: INNER + ((OUTER - INNER) * (next.level - 1)) / 3, born: performance.now() });
+  }
+  const changed = !same(next, aim);
+  aim = next;
+  if (changed) refreshPreview();
+}
+
+function pullOf(a) {
+  const set = currentSet();
+  return { kind: "meaning", dir: set[a.index], partner: a.blendWith != null ? set[a.blendWith] : null, level: a.level };
+}
+
+function pullsNow() {
+  const pulls = [...seg.pins];
+  if (aim?.level && !nearPin(mouse.x, mouse.y)) pulls.push(pullOf(aim));
+  return pulls;
+}
+
+/** Spaces a piece of new text so it reads naturally at the cursor; a paragraph at the end of a paragraph becomes its own paragraph. */
+function placed(str, level) {
+  if (!str) return "";
+  const prev = text[seg.start - 1] ?? "", next = text[seg.start] ?? "";
+  if (level === 3 && (next === "\n" || next === "")) return `\n\n${str.trim()}`;
+  let out = str.trim();
+  if (prev && !/\s/.test(prev) && !/^[.,;:!?]/.test(out)) out = ` ${out}`;
+  if (next && !/[\s.,;:!?]/.test(next)) out = `${out} `;
+  return out;
+}
+
+/** Every pull together: a single plain pull is instant, anything combined (or with references) asks the model. */
+async function combine(target, pulls) {
+  const meanings = pulls.filter((p) => p.kind === "meaning");
+  const refs = pulls.filter((p) => p.kind === "ref").map((p) => ({ title: p.doc.title, text: p.text }));
+  const level = Math.max(1, ...meanings.map((p) => p.level));
+  if (!meanings.length && !refs.length) return target.original;
+  if (meanings.length === 1 && !meanings[0].partner && !refs.length) {
+    const t = meanings[0].dir[KEYS[meanings[0].level]];
+    return target.mode === "write" ? placed(t, level) : t;
+  }
+  const weights = new Map();
+  for (const p of meanings) for (const d of [p.dir, p.partner].filter(Boolean)) weights.set(d.label, Math.max(weights.get(d.label) ?? 0, p.level / 3));
+  const payload = { mode: target.mode, text, start: target.start, end: target.end, refs,
+    pulls: [...weights].map(([label, weight]) => ({ label, weight, length: target.mode === "write" ? NAMES.write[Math.round(weight * 3)] : undefined })) };
+  const { text: out } = await api("compose", payload);
+  return target.mode === "write" ? placed(out, level) : out;
+}
+
+let previewToken = 0, previewTimer = null;
+function refreshPreview() {
+  if (!seg) return;
+  const target = seg, pulls = pullsNow(), token = ++previewToken;
+  clearTimeout(previewTimer);
+  const instant = pulls.length === 0 || (pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner);
+  const run = async () => {
+    try {
+      const t = await combine(target, pulls);
+      if (token === previewToken && seg === target) { target.preview = pulls.length ? t : null; target.waiting = false; renderText(); }
+    } catch (error) { toast(error.message); }
+  };
+  if (instant) run();
+  else { target.waiting = true; renderText(); previewTimer = setTimeout(run, 140); }
+}
+
+function nearPin(x, y) {
+  return seg?.pins.find((p) => Math.hypot(p.x - x, p.y - y) < 14) ?? null;
+}
+
+addEventListener("mousemove", (e) => {
+  mouse = { x: e.clientX, y: e.clientY };
+  trail.push({ x: mouse.x, y: mouse.y, at: performance.now() });
+  if (isOpen()) {
+    const wantPanel = mouse.x > W - EDGE || (refsEl.classList.contains("show") && mouse.x > W - PANEL - 40) || seg.pins.some((p) => p.kind === "ref");
+    refsEl.classList.toggle("show", wantPanel);
+  }
+  updateAim();
+});
+
+addEventListener("wheel", (e) => {
+  if (!isOpen() || seg.loading || e.target.closest("#refs")) return;
+  e.preventDefault();
+  const now = performance.now();
+  if (now < scrollLock || Math.abs(e.deltaY) < 4) return;
+  scrollLock = now + SCROLL_PAUSE;
+  if (e.deltaY > 0) {
+    if (seg.setIndex < seg.sets.length - 1) { seg.setIndex++; swapped(); }
+    else loadSet(seg);
+  } else if (seg.setIndex > 0) { seg.setIndex--; swapped(); }
+  sound.swap();
+}, { passive: false });
+
+function swapped() {
+  labelT = 0;
+  glow = [];
+  aim = null;
+  render();
+  updateAim();
+  refreshPreview();
+}
+
+addEventListener("mousedown", (e) => {
+  if (!isOpen() || e.target.closest("#own, #top")) return;
+  const para = e.target.closest("#refs p");
+  if (e.target.closest("#refs") && !para) return;
+  e.preventDefault();
+  const pin = nearPin(e.clientX, e.clientY);
+  if (pin) {
+    seg.pins = seg.pins.filter((p) => p !== pin);
+    sound.unpin();
+  } else if (para) {
+    const doc = DOCS[+para.dataset.doc], passage = doc.paragraphs[+para.dataset.para];
+    const existing = seg.pins.find((p) => p.kind === "ref" && p.text === passage);
+    if (existing) { seg.pins = seg.pins.filter((p) => p !== existing); sound.unpin(); }
+    else {
+      seg.pins.push({ kind: "ref", doc, text: passage, el: para, born: performance.now(), level: 1,
+        get x() { return this.el.getBoundingClientRect().left + 4; },
+        get y() { const r = this.el.getBoundingClientRect(); return r.top + Math.min(r.height / 2, 14); } });
+      planted.push({ x: e.clientX, y: e.clientY, born: performance.now(), level: 1 });
+      sound.plant(2);
+    }
+  } else {
+    const a = aimAt(e.clientX, e.clientY);
+    if (!a?.level) return;
+    seg.pins.push({ ...pullOf(a), q: a.q, deg: a.deg, born: performance.now(),
+      get x() { return ellipsePoint(this.q, this.deg)[0]; },
+      get y() { return ellipsePoint(this.q, this.deg)[1]; } });
+    planted.push({ x: e.clientX, y: e.clientY, born: performance.now(), level: a.level });
+    sound.plant(a.level);
+  }
+  render();
+  refreshPreview();
+});
+
+async function save() {
+  const target = seg;
+  const pulls = target.pins.length ? target.pins : aim?.level ? [pullOf(aim)] : [];
+  if (!pulls.length) return toast(target.mode === "write" ? "pin a move first, or point at one" : "pin a meaning first, or point at one");
+  collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: target.pins.map((p) => ({ x: p.x, y: p.y })) };
+  sound.save(pulls.length);
+  target.preview = null;
+  const instant = pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner;
+  if (!instant) { target.waiting = true; finish(target, false); }
+  try { target.current = await combine(target, pulls); }
+  catch (error) { toast(error.message); }
+  target.waiting = false;
+  finish(target, true);
+}
+
+function finish(target, fade) {
+  target.done = true;
+  aim = null;
+  ownEl.classList.remove("show");
+  refsEl.classList.remove("show");
+  if (fade) {
+    changes++;
+    target.fadeTimer = setTimeout(() => { if (seg === target) { forget(); render(); } }, 1700);
+  }
+  render();
+}
+
+function cancel() {
+  collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: [] };
+  seg = null;
+  aim = null;
+  ownEl.classList.remove("show");
+  refsEl.classList.remove("show");
+  render();
+}
+
+/* ---------- shorter with the arrow keys ---------- */
+
+function shrinkKey(direction) {
+  if (seg.mode !== "edit") return;
+  if (direction > 0) return grow();
+  const now = performance.now();
+  shrinkState.combo = now - shrinkState.lastAt < COMBO_WINDOW ? shrinkState.combo + 1 : 1;
+  shrinkState.lastAt = now;
+  shrinkState.pending += 0.5 + 0.5 * Math.min(shrinkState.combo, 3);
+  showMeter();
+  sound.charge(shrinkState.combo);
+  clearTimeout(shrinkState.timer);
+  shrinkState.timer = setTimeout(runShrink, 170);
+}
+
+async function runShrink() {
+  if (shrinkState.busy || !seg || seg.mode !== "edit") return;
+  const steps = Math.max(1, Math.round(shrinkState.pending));
+  shrinkState.pending = 0;
+  if (!steps) return;
+  shrinkState.busy = true;
+  const target = seg, before = target.original;
+  try {
+    const { text: shorter } = await api("shrink", { text, start: target.start, end: target.end, steps });
+    if (seg !== target || !shorter || shorter.length >= before.length) { shrinkState.busy = false; showMeter(); return; }
+    await shatter(target, before, shorter);
+    target.history.push(before);
+  } catch (error) { toast(error.message); }
+  shrinkState.busy = false;
+  showMeter();
+  if (shrinkState.pending) runShrink();
+}
+
+/** The words that go turn into white boxes, then break apart; the new wording flashes in. */
+async function shatter(target, before, after) {
+  target.pins = [];
+  target.preview = null;
+  target.doomedFrom = after;
+  renderText();
+  sound.crack();
+  await wait(150);
+  const boxes = [...textEl.querySelectorAll(".doomed")].flatMap((el) => [...el.getClientRects()]);
+  for (const r of boxes) burst(r);
+  sound.shatter(boxes.length);
+  text = text.slice(0, target.start) + after + text.slice(target.end);
+  target.end = target.start + after.length;
+  target.doomedFrom = null;
+  target.bornFrom = before;
+  target.original = target.current = after;
+  renderBorn(target, before, after);
+  reloadSoon(target);
+}
+
+function renderBorn(target, before, after) {
+  renderText();
+  const mid = textEl.querySelector(".seg");
+  if (!mid) return;
+  mid.innerHTML = "";
+  for (const part of diffWords(before, after)) {
+    const w = span(part.text);
+    if (part.changed) w.className = "born";
+    mid.append(w);
+  }
+}
+
+function grow() {
+  const target = seg;
+  const previous = target.history.pop();
+  if (!previous) return toast("nothing to bring back");
+  text = text.slice(0, target.start) + previous + text.slice(target.end);
+  target.end = target.start + previous.length;
+  const before = target.original;
+  target.original = target.current = previous;
+  target.pins = []; target.preview = null;
+  sound.grow();
+  renderBorn(target, before, previous);
+  showMeter();
+  reloadSoon(target);
+}
+
+function reloadSoon(target) {
+  clearTimeout(target.reloadTimer);
+  target.reloadTimer = setTimeout(() => {
+    if (seg !== target) return;
+    target.sets = []; target.setIndex = 0;
+    loadSet(target);
+  }, 700);
+}
+
+function showMeter() {
+  if (!seg) return;
+  const base = seg.history[0] ?? seg.original;
+  const words = (t) => t.split(/\s+/).filter(Boolean).length;
+  const ratio = 1 - words(seg.original) / Math.max(1, words(base));
+  const blocks = Math.min(10, Math.round(ratio * 10));
+  const combo = shrinkState.combo > 1 && performance.now() - shrinkState.lastAt < COMBO_WINDOW * 2 ? `  combo ×${shrinkState.combo}` : "";
+  meterEl.textContent = `shorter ${"■".repeat(blocks)}${"□".repeat(10 - blocks)} −${Math.round(ratio * 100)}%${combo}`;
+  meterEl.classList.toggle("show", ratio > 0 || shrinkState.pending > 0);
+  clearTimeout(showMeter.timer);
+  showMeter.timer = setTimeout(() => meterEl.classList.remove("show"), 1800);
+}
+
+function burst(r) {
+  const count = Math.max(6, Math.min(40, Math.round((r.width * r.height) / 60)));
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: r.left + Math.random() * r.width, y: r.top + Math.random() * r.height,
+      vx: (Math.random() - 0.5) * 7, vy: -Math.random() * 5 - 1,
+      size: 2 + Math.random() * 4, born: performance.now(), life: 600 + Math.random() * 600, spin: Math.random() * 0.4 - 0.2, angle: 0,
+    });
+  }
+}
+
+function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/* ---------- keys ---------- */
+
+addEventListener("keydown", (e) => {
+  if (document.body.classList.contains("editing") || e.target === ownInput) return;
+  if (!isOpen()) return;
+  if (e.key === "Escape") return cancel();
+  if (e.key === "Enter") { e.preventDefault(); return save(); }
+  if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); return shrinkKey(-1); }
+  if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); return shrinkKey(1); }
+  if (e.key === "/") { e.preventDefault(); ownEl.classList.add("show"); ownInput.value = ""; ownInput.focus(); }
+});
+
+ownInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Escape") { ownEl.classList.remove("show"); return; }
+  if (e.key !== "Enter" || !ownInput.value.trim()) return;
+  const label = ownInput.value.trim(), set = currentSet(), target = seg;
+  ownEl.classList.remove("show");
+  if (!set) return;
+  try {
+    let direction;
+    if (target.mode === "write") {
+      const lengths = await Promise.all([1, 2, 3].map((l) => api("compose", { mode: "write", text, start: target.start, end: target.end, refs: [], pulls: [{ label, weight: l / 3, length: NAMES.write[l] }] })));
+      direction = { label, slight: lengths[0].text, medium: lengths[1].text, strong: lengths[2].text };
+    } else direction = (await api("custom", { text, start: target.start, end: target.end, label })).direction;
+    if (set.length >= MAX_MEANINGS) set.splice(set.findLastIndex((d) => d.kind !== "custom"), 1);
+    set.push({ ...direction, kind: "custom" });
+    labelT = 0; glow = [];
+    sound.meaning(set.length - 1);
+  } catch (error) { toast(error.message); }
+  render();
+});
+
+$("edit").addEventListener("click", () => {
+  const editor = $("editor");
+  if (document.body.classList.toggle("editing")) {
+    forget(); editor.value = text; editor.focus(); $("edit").textContent = "done";
+  } else {
+    text = editor.value.trim() || SAMPLE; changes = 0;
+    $("edit").textContent = "edit text";
+    render();
+  }
+});
+$("sound").addEventListener("click", () => { sound.toggle(); renderSound(); });
+renderSound();
+function renderSound() { $("sound").textContent = sound.muted ? "sound off" : "sound on"; }
+
+function renderPanel() {
+  const pinned = new Set(seg?.pins.filter((p) => p.kind === "ref").map((p) => p.text) ?? []);
+  for (const p of refsEl.querySelectorAll("p")) p.classList.toggle("pinned", pinned.has(DOCS[+p.dataset.doc].paragraphs[+p.dataset.para]));
+}
+
+/* ---------- drawing ---------- */
+
+function frame(t) {
+  const time = t / 1000;
+  const open = isOpen();
+  openT += ((open ? 1 : 0) - openT) * (open ? 0.07 : 0.2);
+  if (open && openT > 0.995) openT = 1;
+  labelT = Math.min(1, labelT + 0.035);
+  refsT += ((refsEl.classList.contains("show") ? 1 : 0) - refsT) * 0.12;
+  layoutRing();
+  ctx.clearRect(0, 0, W, H);
+  if (open) drawRing(currentSet(), openT, time);
+  drawCollapse();
+  if (open) drawPins(time);
+  drawPlanted();
+  drawParticles();
+  if (open && !overPanel(mouse.x)) drawCursor();
+  requestAnimationFrame(frame);
+}
+
+function ellipsePoint(q, deg) {
+  const a = ((deg - 90) * Math.PI) / 180;
+  return [CX + Math.cos(a) * RX * q, CY + Math.sin(a) * RY * q];
+}
+
+function arcPath(q, from, to) {
+  ctx.beginPath();
+  const step = Math.max(0.5, (to - from) / 60);
+  for (let d = from; d <= to + 0.001; d += step) {
+    const [x, y] = ellipsePoint(q, Math.min(d, to));
+    d === from ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+}
+
+function sectorPath(q0, q1, from, to) {
+  ctx.beginPath();
+  for (let d = from; d <= to; d += 1) { const [x, y] = ellipsePoint(q1, d); d === from ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  for (let d = to; d >= from; d -= 1) { const [x, y] = ellipsePoint(q0, d); ctx.lineTo(x, y); }
+  ctx.closePath();
+}
+
+function drawRing(set, t, time) {
+  if (!set?.length) return;
+  const n = set.length, span = 360 / n, gap = 1.4;
+  const sweep = easeOut(t) * 360;
+  const now = performance.now();
+  while (glow.length < n) glow.push(0);
+  drawIdleSweep(time, n, span);
+
+  set.forEach((d, i) => {
+    const from = i * span + gap, to = (i + 1) * span - gap;
+    const target = !aim?.level ? 0 : aim.index === i ? 1 : aim.blendWith === i ? 0.7 : 0;
+    glow[i] += (target - glow[i]) * 0.18;
+    const g = glow[i];
+    const end = Math.min(to, sweep);
+    if (end <= from) return;
+
+    if (g > 0.02 && aim?.level) {
+      const qc = Math.min(aim.q, OUTER);
+      const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(RX, RY) * qc);
+      grad.addColorStop(0, "rgba(255,255,255,0)");
+      grad.addColorStop(1, `rgba(255,255,255,${0.07 * g})`);
+      sectorPath(INNER, qc, from, to); ctx.fillStyle = grad; ctx.fill();
+      const stepQ = 0.05, phase = (time * 0.08) % stepQ;
+      for (let q = INNER + phase; q < qc; q += stepQ) {
+        const k = (q - INNER) / Math.max(0.001, qc - INNER);
+        ctx.strokeStyle = `rgba(255,255,255,${(0.04 + 0.3 * k * k) * g})`;
+        ctx.lineWidth = 1;
+        arcPath(q, from + 1, to - 1); ctx.stroke();
+      }
+      for (let k = 1; k <= 2; k++) {
+        const qq = INNER + ((OUTER - INNER) * k) / 3;
+        const passed = aim.level > k;
+        ctx.strokeStyle = `rgba(255,255,255,${(passed ? 0.55 : 0.18) * g})`;
+        ctx.setLineDash(passed ? [] : [2, 6]); ctx.lineWidth = passed ? 1.2 : 1;
+        arcPath(qq, from, to); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+
+    ctx.strokeStyle = `rgba(255,255,255,${(0.24 + 0.76 * g) * Math.min(1, t * 1.4)})`;
+    ctx.lineWidth = 1 + 1.6 * g;
+    arcPath(OUTER, from, end); ctx.stroke();
+
+    const mid = (from + to) / 2;
+    const reached = Math.max(0, Math.min(1, (sweep - from) / Math.max(1, to - from)));
+    const label = `${d.kind === "custom" ? "*" : ""}${d.label}`;
+    const typed = label.slice(0, Math.ceil(label.length * Math.min(reached, labelT * 1.4)));
+    const [lx, ly] = ellipsePoint(OUTER + 0.045, mid);
+    ctx.font = `${g > 0.5 ? 500 : 400} 12px 'IBM Plex Mono', monospace`;
+    ctx.textAlign = Math.abs(lx - CX) < 30 ? "center" : lx < CX ? "right" : "left";
+    ctx.fillStyle = `rgba(255,255,255,${0.45 + 0.55 * g})`;
+    ctx.fillText(typed + (typed.length < label.length && typed.length ? "█" : ""), lx, ly + 4);
+    if (g > 0.5 && aim?.level && aim.index === i) ctx.fillText(`${"■".repeat(aim.level)}${"□".repeat(3 - aim.level)} ${names()[aim.level]}`, lx, ly + 22);
+  });
+
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i], age = (now - f.born) / 450;
+    if (age > 1 || f.index >= n) { flashes.splice(i, 1); continue; }
+    const from = f.index * span + gap, to = (f.index + 1) * span - gap;
+    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - age)})`;
+    ctx.lineWidth = 2 * (1 - age) + 0.5;
+    arcPath(f.q + age * 0.03, from, to); ctx.stroke();
+  }
+
+  ctx.strokeStyle = `rgba(255,255,255,${0.09 * t})`;
+  ctx.setLineDash([1, 7]);
+  ctx.beginPath(); ctx.ellipse(CX, CY, RX * INNER, RY * INNER, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawIdleSweep(time, n, span) {
+  const idle = !aim?.level ? 1 : 0;
+  drawIdleSweep.a = (drawIdleSweep.a ?? 0) + (idle - (drawIdleSweep.a ?? 0)) * 0.05;
+  const a = drawIdleSweep.a;
+  if (a < 0.02) return;
+  const head = (time * 36) % 360;
+  for (let k = 0; k < 18; k++) {
+    const deg = head - k * 1.6;
+    const [x0, y0] = ellipsePoint(INNER, deg), [x1, y1] = ellipsePoint(OUTER, deg);
+    ctx.strokeStyle = `rgba(255,255,255,${0.09 * (1 - k / 18) * a})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  }
+  const lit = Math.floor((((head % 360) + 360) % 360) / span) % n;
+  ctx.strokeStyle = `rgba(255,255,255,${0.12 * a})`;
+  ctx.lineWidth = 1.5;
+  arcPath(OUTER, lit * span + 1.4, (lit + 1) * span - 1.4); ctx.stroke();
+}
+
+function drawCursor() {
+  if (mouse.x < 0) return;
+  const now = performance.now();
+  trail = trail.filter((p) => now - p.at < 220);
+  trail.forEach((p) => {
+    const k = 1 - (now - p.at) / 220;
+    ctx.fillStyle = `rgba(255,255,255,${0.25 * k})`;
+    ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+  });
+  const level = aim?.level ?? 0;
+  if (level) {
+    ctx.strokeStyle = "rgba(255,255,255,0.14)";
+    ctx.setLineDash([2, 5]);
+    const [ix, iy] = ellipsePoint(INNER, aim.deg);
+    ctx.beginPath(); ctx.moveTo(ix, iy); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  const size = 4 + level * 2;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(mouse.x - size / 2, mouse.y - size / 2, size, size);
+}
+
+/** A bond between two points: bright at both ends, fading to nothing in the middle so it never covers the text. */
+function bond(a, b, strength) {
+  const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+  g.addColorStop(0, `rgba(255,255,255,${0.75 * strength})`);
+  g.addColorStop(0.22, `rgba(255,255,255,${0.12 * strength})`);
+  g.addColorStop(0.5, "rgba(255,255,255,0)");
+  g.addColorStop(0.78, `rgba(255,255,255,${0.12 * strength})`);
+  g.addColorStop(1, `rgba(255,255,255,${0.75 * strength})`);
+  ctx.strokeStyle = g;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+}
+
+function drawPins(time) {
+  const pins = seg.pins;
+  for (let i = 1; i < pins.length; i++) bond(pins[i - 1], pins[i], 1);
+  if (pins.length > 2) bond(pins[pins.length - 1], pins[0], 0.45);
+  if (pins.length && aim?.level && !nearPin(mouse.x, mouse.y)) bond(pins[pins.length - 1], mouse, 0.4);
+  ctx.font = "400 10px 'IBM Plex Mono', monospace";
+  ctx.textAlign = "center";
+  for (const p of pins) {
+    const hovered = Math.hypot(p.x - mouse.x, p.y - mouse.y) < 14;
+    const size = 5 + p.level * 2 + 0.8 * Math.sin(time * 2.4 + p.born);
+    ctx.fillStyle = hovered ? "rgba(255,255,255,0.45)" : "#fff";
+    if (p.kind === "ref") { ctx.beginPath(); ctx.arc(p.x, p.y, size / 1.6, 0, Math.PI * 2); ctx.fill(); }
+    else ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.strokeRect(p.x - size, p.y - size, size * 2, size * 2);
+    if (p.kind === "ref") continue;
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    const label = p.partner ? `${p.dir.label} + ${p.partner.label}` : p.dir.label;
+    ctx.fillText(hovered ? "× remove" : `${label} ${"■".repeat(p.level)}`, p.x, p.y + size + 14);
+  }
+}
+
+function drawCollapse() {
+  if (!collapse) return;
+  const age = (performance.now() - collapse.born) / 450;
+  if (age > 1) { collapse = null; return; }
+  const n = collapse.set?.length ?? 0;
+  const e = easeOut(age), span = 360 / Math.max(1, n);
+  ctx.save();
+  ctx.translate(collapse.x, collapse.y);
+  ctx.scale(1 - e * 0.85, 1 - e * 0.85);
+  ctx.translate(-collapse.x, -collapse.y);
+  for (let i = 0; i < n; i++) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.35 * (1 - e)})`;
+    ctx.lineWidth = 1;
+    arcPath(OUTER, i * span + 1.4, (i + 1) * span - 1.4); ctx.stroke();
+  }
+  ctx.restore();
+  for (const p of collapse.pins ?? []) {
+    const x = p.x + (collapse.x - p.x) * e, y = p.y + (collapse.y - p.y) * e, size = 6 * (1 - e) + 1;
+    ctx.fillStyle = `rgba(255,255,255,${1 - e})`;
+    ctx.fillRect(x - size / 2, y - size / 2, size, size);
+  }
+}
+
+function drawPlanted() {
+  const now = performance.now();
+  planted = planted.filter((p) => now - p.born < 1600);
+  for (const p of planted) {
+    const age = (now - p.born) / 1600;
+    const fade = 1 - age;
+    for (let k = 0; k < 3; k++) {
+      const wave = Math.max(0, age - k * 0.1);
+      if (wave <= 0) continue;
+      ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - wave) * fade})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 8 + easeOut(wave) * (70 + p.level * 30), 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+}
+
+function drawParticles() {
+  const now = performance.now();
+  particles = particles.filter((p) => now - p.born < p.life);
+  for (const p of particles) {
+    const k = (now - p.born) / p.life;
+    p.vy += 0.32; p.vx *= 0.985;
+    p.x += p.vx; p.y += p.vy; p.angle += p.spin;
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+    ctx.fillStyle = `rgba(255,255,255,${1 - k})`;
+    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+    ctx.restore();
+  }
+}
+
+function easeOut(x) { return 1 - (1 - Math.min(1, Math.max(0, x))) ** 3; }
+
+function createSound() {
+  let ac = null, out = null, muted = false;
+  try { muted = localStorage.getItem("feeling-sound") === "off"; } catch {}
+  function ready() {
+    if (muted) return false;
+    if (!ac) { ac = new AudioContext(); out = ac.createGain(); out.gain.value = 0.7; out.connect(ac.destination); }
+    ac.resume();
+    return true;
+  }
+  function blip(freq, peak, length, delay = 0, type = "sine", slide = 0) {
+    if (!ac || !ready()) return;
+    const osc = ac.createOscillator(), gain = ac.createGain(), at = ac.currentTime + delay;
+    osc.type = type; osc.frequency.setValueAtTime(freq, at);
+    if (slide) osc.frequency.exponentialRampToValueAtTime(Math.max(30, freq * slide), at + length);
+    gain.gain.setValueAtTime(0, at); gain.gain.linearRampToValueAtTime(peak, at + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+    osc.connect(gain).connect(out); osc.start(at); osc.stop(at + length + 0.05);
+  }
+  function noise(peak, length, cutoff) {
+    if (!ac || !ready()) return;
+    const buffer = ac.createBuffer(1, Math.ceil(ac.sampleRate * length), ac.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 2;
+    const src = ac.createBufferSource(), filter = ac.createBiquadFilter(), gain = ac.createGain();
+    src.buffer = buffer; filter.type = "bandpass"; filter.frequency.value = cutoff; filter.Q.value = 0.8; gain.gain.value = peak;
+    src.connect(filter).connect(gain).connect(out); src.start();
+  }
+  const scale = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25];
+  return {
+    get muted() { return muted; },
+    wake: () => ready(),
+    meaning: (i) => blip(scale[i % scale.length], 0.03, 0.4),
+    tick: (level) => blip(440 * 2 ** ((level * 4) / 12), 0.04, 0.07, 0, "triangle"),
+    swap: () => { blip(880, 0.02, 0.06); blip(1174.66, 0.02, 0.08, 0.05); },
+    plant: (level) => { blip(level ? 196 : 147, 0.08, 0.5); if (level) blip(392 * 2 ** (level / 12), 0.035, 0.9, 0.06); },
+    unpin: () => blip(147, 0.05, 0.25, 0, "triangle"),
+    save: (count) => { [523.25, 659.25, 783.99, 1046.5].slice(0, Math.min(4, count + 1)).forEach((f, i) => blip(f, 0.035, 0.9, i * 0.07)); },
+    charge: (combo) => blip(300 + combo * 90, 0.04, 0.06, 0, "square"),
+    crack: () => blip(1600, 0.03, 0.05, 0, "square"),
+    shatter: (pieces) => { noise(0.25, 0.35, 2200); noise(0.15, 0.5, 700); blip(220, 0.06, 0.4, 0, "sawtooth", 0.3); },
+    grow: () => blip(330, 0.04, 0.35, 0, "sine", 2),
+    toggle() { muted = !muted; try { localStorage.setItem("feeling-sound", muted ? "off" : "on"); } catch {} },
+  };
+}
+
+/** Word-level diff. With `removed`, marks the words of `a` that are gone in `b`; otherwise the words of `b` that are new. */
+function diffWords(a, b, removed = false) {
+  const A = a.split(/(\s+)/), B = b.split(/(\s+)/);
+  const n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0;
+  if (removed) {
+    while (i < n) {
+      if (j < m && A[i] === B[j]) { out.push({ text: A[i], changed: false }); i++; j++; }
+      else if (j < m && L[i][j + 1] > L[i + 1][j]) j++;
+      else { out.push({ text: A[i], changed: /\S/.test(A[i]) }); i++; }
+    }
+  } else {
+    while (j < m) {
+      if (i < n && A[i] === B[j]) { out.push({ text: B[j], changed: false }); i++; j++; }
+      else if (i < n && L[i + 1][j] >= L[i][j + 1]) i++;
+      else { out.push({ text: B[j], changed: /\S/.test(B[j]) }); j++; }
+    }
+  }
+  out.forEach((part, k) => {
+    if (!/\S/.test(part.text) && out[k - 1]?.changed && out[k + 1]?.changed) part.changed = true;
+  });
+  return out;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+</script>
+</body>
+</html>

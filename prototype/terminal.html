@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #000; --fg: #fff; --mid: #8a8a8a; --low: #4a4a4a; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 400 16px/1.9 var(--mono); -webkit-font-smoothing: antialiased; min-height: 100vh; display: grid; place-items: center; padding: 64px 20px; }
+  main { width: min(72ch, 100%); }
+  button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; }
+
+  #top { position: fixed; top: 18px; left: 24px; right: 24px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mid); }
+  #top b { color: var(--fg); font-weight: 500; }
+  #top button { color: var(--mid); margin-left: 18px; }
+  #top button:hover { color: var(--fg); }
+
+  #text { white-space: pre-wrap; }
+  #text::selection, #text *::selection { background: #fff; color: #000; }
+  .seg { cursor: pointer; text-decoration: underline dotted var(--mid); text-underline-offset: 4px; }
+  .seg .new { text-decoration: underline; text-decoration-color: var(--fg); text-underline-offset: 4px; }
+  .seg.focus { background: var(--fg); color: var(--bg); text-decoration: none; padding: 1px 0; }
+  .seg.focus .new { text-decoration-color: var(--bg); text-decoration-thickness: 2px; }
+  .seg.waiting { opacity: .55; }
+  .caret { display: inline-block; width: .6em; height: 1.1em; vertical-align: -0.2em; background: var(--fg); margin-left: 2px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #panel { margin-top: 30px; font-size: 14px; display: none; }
+  #panel.show { display: block; }
+  .row { display: grid; grid-template-columns: 1.6ch 4ch 22ch auto; gap: 0 1ch; color: var(--mid); user-select: none; cursor: default; }
+  .row .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row.cursor { color: var(--fg); }
+  .row.active .label { color: var(--fg); }
+  .row.custom .label { font-style: italic; }
+  .cells { display: inline-flex; gap: 0; cursor: ew-resize; }
+  .cell { width: 2.4ch; text-align: center; color: var(--low); }
+  .cell.on { color: var(--fg); }
+  .row:hover .cell:not(.on) { color: var(--mid); }
+  .help { margin-top: 18px; color: var(--mid); font-size: 12.5px; }
+  .help b { color: var(--fg); font-weight: 500; }
+  #own { display: none; margin-top: 10px; font-size: 14px; }
+  #own.show { display: flex; gap: 1ch; }
+  #own input { flex: 1; font: inherit; color: var(--fg); background: none; border: none; outline: none; caret-color: var(--fg); }
+  #hint { margin-top: 30px; color: var(--mid); font-size: 12.5px; }
+  #toast { position: fixed; bottom: 20px; left: 24px; color: #ff8f73; font-size: 12px; }
+
+  #editor { width: 100%; min-height: 40vh; font: inherit; color: var(--fg); background: none; border: 1px solid var(--low); padding: 14px; outline: none; resize: vertical; display: none; }
+  body.editing #editor { display: block; }
+  body.editing #text, body.editing #panel, body.editing #hint { display: none; }
+</style>
+</head>
+<body>
+<div id="top"><span id="status"><b>feeling</b></span><span><button id="sound"></button><button id="edit">edit text</button></span></div>
+<main>
+  <div id="text"></div>
+  <textarea id="editor" spellcheck="false"></textarea>
+  <div id="panel">
+    <div id="rows"></div>
+    <div id="own"><span>&gt; your own:</span><input id="ownInput" maxlength="40" /></div>
+    <div class="help"><b>↑↓</b> choose  <b>←→</b> strength  <b>1-5</b> jump  <b>tab</b> more  <b>/</b> your own  <b>↵</b> keep  <b>esc</b> undo<br>mouse: click or drag across <b>□□□</b>, or scroll on a row</div>
+  </div>
+  <div id="hint"></div>
+</main>
+<div id="toast"></div>
+
+<script>
+const SAMPLE = "For three years I have built data tools for a small research team. I think I could help your company, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.";
+const LEVELS = ["", "slight", "medium", "strong"];
+const MAX_DIRECTIONS = 5;
+
+const $ = (id) => document.getElementById(id);
+const textEl = $("text"), panelEl = $("panel"), rowsEl = $("rows"), ownEl = $("own"), ownInput = $("ownInput"), hintEl = $("hint"), statusEl = $("status"), toastEl = $("toast");
+
+let pieces = [{ kind: "plain", text: SAMPLE }];
+let segs = {};
+let nextId = 1;
+let focusId = null;
+let cursor = 0;
+let scrub = null;
+let blendTimer = null, blendToken = 0;
+const sound = createSound();
+
+render();
+
+function focused() { return focusId != null ? segs[focusId] : null; }
+function pieceText(p) { return p.kind === "plain" ? p.text : segs[p.id].current; }
+
+function render() { renderText(); renderPanel(); renderStatus(); }
+
+function renderText() {
+  textEl.innerHTML = "";
+  pieces.forEach((p, i) => {
+    const span = document.createElement("span");
+    span.dataset.p = i;
+    if (p.kind === "plain") { span.textContent = p.text; textEl.append(span); return; }
+    const seg = segs[p.id];
+    span.className = "seg" + (seg.id === focusId ? " focus" : "") + (seg.waiting ? " waiting" : "");
+    span.dataset.seg = seg.id;
+    for (const part of diffWords(seg.original, seg.current)) {
+      const w = document.createElement("span");
+      if (part.changed) w.className = "new";
+      w.textContent = part.text;
+      span.append(w);
+    }
+    if (seg.id === focusId) span.insertAdjacentHTML("beforeend", '<span class="caret"></span>');
+    textEl.append(span);
+  });
+}
+
+function renderPanel() {
+  const seg = focused();
+  panelEl.classList.toggle("show", !!seg);
+  hintEl.textContent = seg ? "" : "select some words with the mouse to start shaping them";
+  if (!seg) return;
+  if (!seg.directions) { rowsEl.innerHTML = `<div class="row cursor"><span>&gt;</span><span></span><span class="label">reading the passage…</span></div>`; return; }
+  rowsEl.innerHTML = "";
+  seg.directions.forEach((d, i) => {
+    const level = seg.levels[i];
+    const row = document.createElement("div");
+    row.className = "row" + (i === cursor ? " cursor" : "") + (level ? " active" : "") + (d.kind === "custom" ? " custom" : "");
+    row.dataset.i = i;
+    row.innerHTML = `<span>${i === cursor ? "&gt;" : ""}</span><span>[${i + 1}]</span><span class="label">${esc(d.label)}</span><span class="cells">${[1, 2, 3].map((n) => `<span class="cell${n <= level ? " on" : ""}" data-n="${n}">${n <= level ? "■" : "□"}</span>`).join("")}</span>`;
+    rowsEl.append(row);
+  });
+}
+
+function renderStatus() {
+  const seg = focused();
+  const shaped = Object.values(segs).filter((s) => s.current !== s.original).length;
+  let detail = shaped ? `${shaped} passage${shaped > 1 ? "s" : ""} shaped` : "";
+  if (seg?.directions) {
+    const mix = seg.directions.map((d, i) => seg.levels[i] ? `${d.label} ${"■".repeat(seg.levels[i])}${"□".repeat(3 - seg.levels[i])}` : null).filter(Boolean);
+    detail = mix.length ? mix.join(" + ") : "unchanged";
+  }
+  statusEl.innerHTML = `<b>feeling</b>${detail ? `  ·  ${esc(detail)}` : ""}`;
+}
+
+function toast(message) {
+  toastEl.textContent = message;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (toastEl.textContent = ""), 4000);
+}
+
+textEl.addEventListener("mouseup", () => {
+  const sel = getSelection();
+  if (sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const a = pieceIndex(range.startContainer), b = pieceIndex(range.endContainer);
+  sel.removeAllRanges();
+  if (a == null || a !== b || pieces[a].kind !== "plain") return toast("select within plain text, not across a shaped passage");
+  const plain = pieces[a].text;
+  const [s, t] = snapToWords(plain, Math.min(range.startOffset, range.endOffset), Math.max(range.startOffset, range.endOffset));
+  if (t - s < 2) return;
+  keep();
+  const id = nextId++;
+  segs[id] = { id, original: plain.slice(s, t), current: plain.slice(s, t), directions: null, levels: [], saved: null };
+  pieces.splice(a, 1, ...[s > 0 && { kind: "plain", text: plain.slice(0, s) }, { kind: "seg", id }, t < plain.length && { kind: "plain", text: plain.slice(t) }].filter(Boolean));
+  open(segs[id]);
+  loadDirections(segs[id], []);
+});
+
+textEl.addEventListener("click", (e) => {
+  const el = e.target.closest(".seg");
+  if (!el || +el.dataset.seg === focusId || !getSelection().isCollapsed) return;
+  keep();
+  open(segs[+el.dataset.seg]);
+});
+
+function open(seg) {
+  focusId = seg.id;
+  cursor = 0;
+  seg.saved = { levels: [...seg.levels], current: seg.current };
+  render();
+}
+
+function pieceIndex(node) {
+  const el = (node.nodeType === 3 ? node.parentElement : node).closest("[data-p]");
+  if (!el || !textEl.contains(el) || el.classList.contains("seg") || el.closest(".seg")) return null;
+  return +el.dataset.p;
+}
+
+function snapToWords(text, s, t) {
+  while (s > 0 && /\S/.test(text[s - 1])) s--;
+  while (t < text.length && /[^\s.,;:!?]/.test(text[t])) t++;
+  while (s < t && /\s/.test(text[s])) s++;
+  while (t > s && /\s/.test(text[t - 1])) t--;
+  return [s, t];
+}
+
+async function loadDirections(seg, exclude) {
+  const kept = (seg.directions ?? []).map((d, i) => ({ d, level: seg.levels[i] })).filter(({ d, level }) => level || d.kind === "custom");
+  seg.directions = null;
+  render();
+  try {
+    const { directions } = await api("bloom", { ...passageOf(seg), exclude });
+    const fresh = directions.map((d) => ({ d: { ...d, kind: "suggested" }, level: 0 }));
+    const merged = [...kept, ...fresh].slice(0, MAX_DIRECTIONS);
+    seg.directions = merged.map((m) => m.d);
+    seg.levels = merged.map((m) => m.level);
+  } catch (error) {
+    toast(error.message);
+    seg.directions = kept.map((m) => m.d);
+    seg.levels = kept.map((m) => m.level);
+  }
+  cursor = 0;
+  render();
+}
+
+function passageOf(seg) {
+  let offset = 0;
+  for (const p of pieces) { if (p.kind === "seg" && p.id === seg.id) break; offset += pieceText(p).length; }
+  const text = pieces.map((p) => (p.kind === "seg" && p.id === seg.id ? seg.original : pieceText(p))).join("");
+  return { text, start: offset, end: offset + seg.original.length };
+}
+
+async function api(route, payload) {
+  const res = await fetch(`/api/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
+  return json;
+}
+
+function setLevel(seg, i, level) {
+  level = Math.max(0, Math.min(3, level));
+  if (seg.levels[i] === level) return;
+  seg.levels[i] = level;
+  sound.tick(level);
+  recompute(seg);
+}
+
+function recompute(seg) {
+  const active = seg.directions.map((d, i) => ({ d, level: seg.levels[i] })).filter((a) => a.level);
+  clearTimeout(blendTimer);
+  seg.waiting = false;
+  if (!active.length) seg.current = seg.original;
+  else if (active.length === 1) seg.current = active[0].d[LEVELS[active[0].level]];
+  else {
+    seg.waiting = true;
+    const token = ++blendToken;
+    blendTimer = setTimeout(async () => {
+      try {
+        const { text } = await api("blend", { ...passageOf(seg), pulls: active.map((a) => ({ label: a.d.label, weight: a.level / 3 })) });
+        if (token === blendToken) seg.current = text;
+      } catch (error) { toast(error.message); }
+      if (token === blendToken) { seg.waiting = false; render(); }
+    }, 180);
+  }
+  render();
+}
+
+function keep() {
+  const seg = focused();
+  if (!seg) return;
+  focusId = null;
+  if (seg.current === seg.original && !seg.levels.some(Boolean)) removeSeg(seg.id);
+  else if (seg.saved && seg.current !== seg.saved.current) sound.chime();
+  render();
+}
+
+function undo() {
+  const seg = focused();
+  if (!seg) return;
+  if (seg.saved) { seg.levels = [...seg.saved.levels]; seg.current = seg.saved.current; }
+  keep();
+}
+
+function removeSeg(id) {
+  const i = pieces.findIndex((p) => p.kind === "seg" && p.id === id);
+  if (i < 0) return;
+  pieces[i] = { kind: "plain", text: segs[id].current };
+  delete segs[id];
+  const merged = [];
+  for (const p of pieces) {
+    const last = merged[merged.length - 1];
+    if (p.kind === "plain" && last?.kind === "plain") last.text += p.text;
+    else merged.push({ ...p });
+  }
+  pieces = merged;
+}
+
+addEventListener("keydown", (e) => {
+  if (document.body.classList.contains("editing") || e.target === ownInput) return;
+  const seg = focused();
+  if (!seg) return;
+  if (e.key === "Escape") return undo();
+  if (e.key === "Enter") { e.preventDefault(); return keep(); }
+  if (!seg.directions) return;
+  const n = seg.directions.length;
+  if (e.key === "ArrowDown") { e.preventDefault(); cursor = (cursor + 1) % n; sound.move(); return render(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); cursor = (cursor - 1 + n) % n; sound.move(); return render(); }
+  if (e.key === "ArrowRight") { e.preventDefault(); return setLevel(seg, cursor, seg.levels[cursor] + 1); }
+  if (e.key === "ArrowLeft") { e.preventDefault(); return setLevel(seg, cursor, seg.levels[cursor] - 1); }
+  if (e.key === "Tab") { e.preventDefault(); return loadDirections(seg, seg.directions.map((d) => d.label)); }
+  if (e.key === "/") { e.preventDefault(); ownEl.classList.add("show"); ownInput.value = ""; ownInput.focus(); return; }
+  const k = Number(e.key);
+  if (k >= 1 && k <= n) {
+    if (cursor === k - 1) setLevel(seg, cursor, (seg.levels[cursor] + 1) % 4);
+    else { cursor = k - 1; sound.move(); render(); }
+  }
+});
+
+ownInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Escape") { ownEl.classList.remove("show"); return; }
+  if (e.key !== "Enter" || !ownInput.value.trim()) return;
+  const seg = focused(), label = ownInput.value.trim();
+  ownEl.classList.remove("show");
+  if (!seg?.directions) return;
+  try {
+    const { direction } = await api("custom", { ...passageOf(seg), label });
+    if (seg.directions.length >= MAX_DIRECTIONS) {
+      const free = seg.levels.findLastIndex((l, i) => !l && seg.directions[i].kind !== "custom");
+      const at = free >= 0 ? free : seg.directions.length - 1;
+      seg.directions.splice(at, 1); seg.levels.splice(at, 1);
+    }
+    seg.directions.push({ ...direction, kind: "custom" });
+    seg.levels.push(0);
+    cursor = seg.directions.length - 1;
+  } catch (error) { toast(error.message); }
+  render();
+});
+
+rowsEl.addEventListener("mousedown", (e) => {
+  const row = e.target.closest(".row");
+  const seg = focused();
+  if (!row || !seg?.directions) return;
+  e.preventDefault();
+  cursor = +row.dataset.i;
+  const cell = e.target.closest(".cell");
+  if (cell) {
+    const n = +cell.dataset.n;
+    setLevel(seg, cursor, seg.levels[cursor] === n ? n - 1 : n);
+    scrub = { row, i: cursor };
+  }
+  render();
+});
+addEventListener("mousemove", (e) => {
+  if (!scrub) return;
+  const seg = focused();
+  const cells = [...rowsEl.querySelectorAll(`.row[data-i="${scrub.i}"] .cell`)];
+  if (!seg || !cells.length) return;
+  const first = cells[0].getBoundingClientRect(), last = cells.at(-1).getBoundingClientRect();
+  const level = e.clientX < first.left ? 0 : Math.min(3, Math.ceil(((e.clientX - first.left) / (last.right - first.left)) * 3));
+  setLevel(seg, scrub.i, level);
+});
+addEventListener("mouseup", () => (scrub = null));
+rowsEl.addEventListener("wheel", (e) => {
+  const row = e.target.closest(".row");
+  const seg = focused();
+  if (!row || !seg?.directions) return;
+  e.preventDefault();
+  cursor = +row.dataset.i;
+  setLevel(seg, cursor, seg.levels[cursor] + (e.deltaY < 0 ? 1 : -1));
+}, { passive: false });
+
+$("edit").addEventListener("click", () => {
+  const editor = $("editor");
+  if (document.body.classList.toggle("editing")) {
+    editor.value = pieces.map(pieceText).join(""); editor.focus(); $("edit").textContent = "done";
+  } else {
+    pieces = [{ kind: "plain", text: editor.value.trim() || SAMPLE }];
+    segs = {}; focusId = null;
+    $("edit").textContent = "edit text";
+    render();
+  }
+});
+
+$("sound").addEventListener("click", () => { sound.toggle(); renderSound(); });
+renderSound();
+function renderSound() { $("sound").textContent = sound.muted ? "sound off" : "sound on"; }
+
+function createSound() {
+  let ac = null, out = null, muted = false;
+  try { muted = localStorage.getItem("feeling-sound") === "off"; } catch {}
+  function ready() {
+    if (muted) return false;
+    if (!ac) { ac = new AudioContext(); out = ac.createGain(); out.gain.value = 0.7; out.connect(ac.destination); }
+    ac.resume();
+    return true;
+  }
+  function blip(freq, peak, length, delay = 0, type = "square") {
+    if (!ready()) return;
+    const osc = ac.createOscillator(), gain = ac.createGain(), at = ac.currentTime + delay;
+    const soft = ac.createBiquadFilter(); soft.type = "lowpass"; soft.frequency.value = 2400;
+    osc.type = type; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, at); gain.gain.linearRampToValueAtTime(peak, at + 0.004); gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+    osc.connect(soft).connect(gain).connect(out); osc.start(at); osc.stop(at + length + 0.05);
+  }
+  return {
+    get muted() { return muted; },
+    tick: (level) => blip(level ? 440 * 2 ** (level * 4 / 12) : 330, 0.035, 0.06),
+    move: () => blip(1200, 0.012, 0.025),
+    chime: () => { blip(880, 0.03, 0.12, 0, "triangle"); blip(1320, 0.03, 0.2, 0.07, "triangle"); },
+    toggle() { muted = !muted; try { localStorage.setItem("feeling-sound", muted ? "off" : "on"); } catch {} },
+  };
+}
+
+function diffWords(a, b) {
+  const A = a.split(/(\s+)/), B = b.split(/(\s+)/);
+  const n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0;
+  while (j < m) {
+    if (i < n && A[i] === B[j]) { out.push({ text: B[j], changed: false }); i++; j++; }
+    else if (i < n && L[i + 1][j] >= L[i][j + 1]) i++;
+    else { out.push({ text: B[j], changed: /\S/.test(B[j]) }); j++; }
+  }
+  return out;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+</script>
+</body>
+</html>

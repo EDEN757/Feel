@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bloom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #06070b;
+    --ink: #ebe7de;
+    --dim: rgba(235, 231, 222, 0.38);
+    --faint: rgba(235, 231, 222, 0.16);
+    --gold: #e9cb8b;
+    --serif: "Newsreader", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; }
+  body { font-family: var(--serif); -webkit-font-smoothing: antialiased; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; }
+
+  #text {
+    position: fixed; left: 50%; top: 50%; width: min(620px, 84vw); transform: translate(-50%, calc(-50% - var(--lift, 0px)));
+    font-size: clamp(17px, 0.9vw + 11px, 23px); line-height: 2.1; font-weight: 300; text-wrap: pretty;
+    transition: top 1.2s cubic-bezier(.2,.7,.1,1), font-size 1.2s cubic-bezier(.2,.7,.1,1), color .5s, transform .6s cubic-bezier(.2,.7,.1,1);
+  }
+  #text::selection, #text *::selection { background: rgba(233, 203, 139, 0.22); }
+  body.open #text { color: rgba(235, 231, 222, 0.2); user-select: none; }
+  body.sky #text { top: 82%; font-size: 17px; line-height: 1.9; user-select: none; }
+
+  .seg { cursor: pointer; text-decoration: underline dotted rgba(233,203,139,.4); text-underline-offset: 7px; transition: color .4s; }
+  .seg:hover { text-decoration-color: var(--gold); }
+  .seg.active { color: var(--ink); text-decoration: none; }
+  body.sky .seg { text-decoration: none; cursor: default; }
+  .seg .new { color: var(--gold); }
+  .seg.active .new { animation: settle .5s cubic-bezier(.2,.7,.1,1); }
+  .seg.loading { animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes settle { from { opacity: .2; filter: blur(4px); } to { opacity: 1; filter: none; } }
+  @keyframes breathe { 50% { opacity: .35; } }
+
+  #editor { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(620px, 84vw); height: 46vh;
+    background: transparent; color: var(--ink); border: 1px solid var(--faint); border-radius: 4px; padding: 18px;
+    font: 300 20px/1.8 var(--serif); resize: none; outline: none; display: none; }
+  body.editing #editor { display: block; }
+  body.editing #text { display: none; }
+
+  .petal { position: fixed; transform: translate(-50%, -50%); font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em;
+    color: var(--dim); white-space: nowrap; text-align: center; pointer-events: none; transition: color .15s, opacity .4s; }
+  .petal small { display: block; margin-top: 3px; font-size: 9.5px; color: var(--gold); opacity: 0; transition: opacity .15s; letter-spacing: .12em; }
+  .petal.lead { color: var(--ink); }
+  .petal.lead small { opacity: .9; }
+  .petal.custom { font-style: italic; }
+
+  #tools { position: fixed; transform: translate(-50%, 0); display: none; white-space: nowrap; gap: 18px; align-items: center; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; }
+  body.open #tools { display: flex; }
+  #tools button { background: none; border: none; color: var(--dim); font: inherit; letter-spacing: inherit; cursor: pointer; padding: 6px 2px; }
+  #tools button:hover { color: var(--ink); }
+  #own { background: transparent; border: none; border-bottom: 1px solid var(--faint); color: var(--ink); font: italic 300 15px var(--serif);
+    width: 190px; padding: 4px 2px; outline: none; display: none; }
+  #own.show { display: block; }
+
+  .hud { position: fixed; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; color: var(--dim); }
+  #brand { top: 26px; left: 30px; }
+  #brand b { color: var(--ink); font-weight: 400; }
+  #edit { top: 22px; right: 26px; background: none; border: none; cursor: pointer; padding: 4px; }
+  #edit:hover { color: var(--ink); }
+  body.sky #edit, body.open #edit { opacity: 0; pointer-events: none; }
+  #hint { bottom: 22px; left: 50%; transform: translateX(-50%); width: 92vw; text-align: center; line-height: 1.7; pointer-events: none; }
+  #toast { bottom: 54px; left: 50%; transform: translateX(-50%); color: #f0a58b; opacity: 0; transition: opacity .4s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div id="text"></div>
+<textarea id="editor" spellcheck="false"></textarea>
+<div id="petals"></div>
+<div id="tools"><button id="again">↻ other directions</button><button id="ownBtn">+ your own</button><input id="own" placeholder="a feeling, an idea…" /></div>
+<div class="hud" id="brand"><b>feeling</b> · bloom</div>
+<button class="hud" id="edit">edit text</button>
+<div class="hud" id="hint"></div>
+<div class="hud" id="toast"></div>
+
+<script>
+const SAMPLE = "For three years I have built data tools for a small research team. I think I could help your company, because I learned to work with people from different fields, and I am hopeful that this experience would be useful in the role.";
+let R = 118;
+const DEAD_ZONE = 22;
+const GAP = 46;
+const LEVELS = [["slight", 0.12], ["medium", 0.42], ["strong", 0.74]];
+const BLEND_MIN = 0.26;
+const MAX_PETALS = 6;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("sky"), ctx = canvas.getContext("2d");
+const textEl = $("text"), petalsEl = $("petals"), toolsEl = $("tools"), ownEl = $("own"), hintEl = $("hint"), toastEl = $("toast");
+
+let W = 0, H = 0;
+let pieces = [{ kind: "plain", text: SAMPLE }];
+let segs = {};
+let nextId = 1;
+let open = null;
+let mouse = { x: -999, y: -999 };
+let ignoreClick = false;
+let mode = "edit";
+let skyT = 0, angle = 0.4, drag = null;
+let commitOrder = [];
+const dust = Array.from({ length: 150 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 0.9 + 0.2, p: Math.random() * 6.28 }));
+
+resize();
+addEventListener("resize", resize);
+renderText();
+renderHint();
+requestAnimationFrame(frame);
+
+function resize() {
+  const dpr = devicePixelRatio || 1;
+  W = innerWidth; H = innerHeight;
+  R = Math.round(clamp(Math.min(W, H) * 0.15, 66, 118));
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+const fullText = () => pieces.map(pieceText).join("");
+const pieceText = (p) => (p.kind === "plain" ? p.text : segs[p.id].current);
+
+function renderText() {
+  textEl.innerHTML = "";
+  pieces.forEach((p, i) => {
+    const span = document.createElement("span");
+    span.dataset.p = i;
+    if (p.kind === "plain") span.textContent = p.text;
+    else {
+      const seg = segs[p.id];
+      span.className = "seg" + (open?.id === p.id ? " active" : "") + (seg.loading ? " loading" : "");
+      span.dataset.seg = p.id;
+      const shown = open?.id === p.id ? previewText(open) : seg.current;
+      for (const part of diffWords(seg.original, shown)) {
+        const w = document.createElement("span");
+        if (part.changed) w.className = "new";
+        w.textContent = part.text;
+        span.append(w);
+      }
+    }
+    textEl.append(span);
+  });
+}
+
+function renderHint() {
+  hintEl.textContent =
+    mode === "sky" ? "drag to turn your constellation  ·  esc to keep shaping" :
+    open && !open.directions ? "reading the passage…" :
+    open ? "closer is stronger  ·  click to keep  ·  centre undoes  ·  esc" :
+    "highlight any words to reshape them  ·  click a shaped passage to change it  ·  ↵ see the constellation";
+}
+
+function toast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => toastEl.classList.remove("show"), 4200);
+}
+
+textEl.addEventListener("mouseup", (e) => {
+  if (open || mode !== "edit") return;
+  const sel = getSelection();
+  if (sel.isCollapsed) {
+    const segEl = e.target.closest(".seg");
+    if (segEl) openBloom(+segEl.dataset.seg, e);
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  const a = pieceOf(range.startContainer), b = pieceOf(range.endContainer);
+  sel.removeAllRanges();
+  if (a == null || b == null) return;
+  const hitSeg = [a.i, b.i].map((i) => pieces[i]).find((p) => p.kind === "seg");
+  if (hitSeg) return openBloom(hitSeg.id, e);
+  if (a.i !== b.i) return toast("highlight within one stretch of plain text");
+  const plain = pieces[a.i].text;
+  let [s, t] = snapToWords(plain, Math.min(range.startOffset, range.endOffset), Math.max(range.startOffset, range.endOffset));
+  if (t - s < 2) return;
+  const id = nextId++;
+  segs[id] = { id, original: plain.slice(s, t), current: plain.slice(s, t), directions: null, choice: null };
+  pieces.splice(a.i, 1, ...[
+    s > 0 && { kind: "plain", text: plain.slice(0, s) },
+    { kind: "seg", id },
+    t < plain.length && { kind: "plain", text: plain.slice(t) },
+  ].filter(Boolean));
+  openBloom(id, e);
+});
+
+function pieceOf(node) {
+  const el = (node.nodeType === 3 ? node.parentElement : node).closest("[data-p]");
+  return el && textEl.contains(el) ? { i: +el.dataset.p } : null;
+}
+
+function snapToWords(text, s, t) {
+  while (s > 0 && /\S/.test(text[s - 1])) s--;
+  while (t < text.length && /[^\s.,;:!?]/.test(text[t])) t++;
+  while (s < t && /\s/.test(text[s])) s++;
+  while (t > s && /\s/.test(text[t - 1])) t--;
+  return [s, t];
+}
+
+function openBloom(id, e) {
+  const seg = segs[id];
+  open = seg;
+  renderText();
+  placeBloom(seg, e);
+  ignoreClick = true;
+  setTimeout(() => (ignoreClick = false), 300);
+  document.body.classList.add("open");
+  ownEl.classList.remove("show");
+  layoutPetals();
+  renderText();
+  renderHint();
+  if (!seg.directions) fetchDirections(seg, []);
+}
+
+function segRects(seg) {
+  return [...textEl.querySelectorAll(`[data-seg="${seg.id}"]`)].flatMap((el) => [...el.getClientRects()]);
+}
+
+function placeBloom(seg, e) {
+  textEl.style.setProperty("--lift", "0px");
+  const tr = textEl.getBoundingClientRect();
+  const rects = segRects(seg);
+  const mid = rects.length ? (Math.min(...rects.map((r) => r.top)) + Math.max(...rects.map((r) => r.bottom))) / 2 : e.clientY;
+  const half = R + 120;
+  const sides = [["left", tr.left, tr.left], ["right", W - tr.right, tr.right]].filter(([, room]) => room >= 2 * half);
+  let lift = 0;
+  if (sides.length) {
+    const [side, room] = sides.sort((a, b) => Math.abs(e.clientX - a[2]) - Math.abs(e.clientX - b[2]))[0];
+    seg.center = { x: side === "left" ? room / 2 : tr.right + room / 2, y: clamp(mid, R + 70, H - R - 100) };
+  } else {
+    const needed = GAP + 2 * R + 140;
+    lift = clamp(needed - (H - tr.bottom), 0, Math.max(0, tr.top - 64));
+    seg.center = { x: clamp(e.clientX, half, W - half), y: tr.bottom - lift + GAP + R };
+  }
+  textEl.style.setProperty("--lift", `${lift}px`);
+  mouse = { ...seg.center };
+}
+
+async function fetchDirections(seg, exclude) {
+  seg.directions = null;
+  layoutPetals(); renderHint();
+  try {
+    const { directions } = await api("bloom", { ...passageOf(seg), exclude });
+    seg.directions = directions.map((d) => ({ ...d, kind: "suggested" }));
+  } catch (error) {
+    toast(error.message);
+    if (open === seg) closeBloom(false);
+    return;
+  }
+  if (open === seg) { layoutPetals(); renderText(); renderHint(); }
+}
+
+function passageOf(seg) {
+  let offset = 0;
+  for (const p of pieces) {
+    if (p.kind === "seg" && p.id === seg.id) break;
+    offset += pieceText(p).length;
+  }
+  const text = pieces.map((p) => (p.kind === "seg" && p.id === seg.id ? seg.original : pieceText(p))).join("");
+  return { text, start: offset, end: offset + seg.original.length };
+}
+
+async function api(route, payload) {
+  const res = await fetch(`/api/${route}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? `request failed (${res.status})`);
+  return json;
+}
+
+function petalAngles(n) {
+  const start = n === 4 ? -Math.PI / 4 : -Math.PI / 2;
+  return Array.from({ length: n }, (_, i) => start + (i * Math.PI * 2) / n);
+}
+
+function layoutPetals() {
+  petalsEl.innerHTML = "";
+  if (!open) return;
+  const { x, y } = open.center;
+  toolsEl.style.left = `${x}px`;
+  toolsEl.style.top = `${y + R + 34}px`;
+  hintEl.style.opacity = y + R + 64 > H - 44 ? 0 : 1;
+  if (!open.directions) return;
+  petalAngles(open.directions.length).forEach((a, i) => {
+    const d = open.directions[i];
+    const el = document.createElement("div");
+    el.className = "petal" + (d.kind === "custom" ? " custom" : "");
+    const lx = x + Math.cos(a) * (R + 26), ly = y + Math.sin(a) * (R + 22);
+    el.style.left = `${lx}px`; el.style.top = `${ly}px`;
+    el.innerHTML = `${escapeHtml(d.label)}<small></small>`;
+    petalsEl.append(el);
+  });
+}
+
+function weightsAt(seg, px, py) {
+  const n = seg.directions?.length ?? 0;
+  if (!n) return [];
+  const dx = px - seg.center.x, dy = py - seg.center.y;
+  const r = Math.hypot(dx, dy), phi = Math.atan2(dy, dx);
+  const radial = r > R * 1.8 ? 0 : clamp((r - DEAD_ZONE) / (R - DEAD_ZONE), 0, 1);
+  const shares = petalAngles(n).map((a) => Math.max(0, Math.cos(phi - a)) ** 4);
+  const total = shares.reduce((s, v) => s + v, 0) || 1;
+  return shares.map((s) => (radial * s) / total * (n <= 3 ? 1 : 1));
+}
+
+function levelOf(w) {
+  let level = null;
+  for (const [name, min] of LEVELS) if (w >= min) level = name;
+  return level;
+}
+
+function choiceAt(seg, px, py) {
+  const weights = weightsAt(seg, px, py);
+  const order = weights.map((w, i) => [w, i]).sort((a, b) => b[0] - a[0]);
+  const [lead, second] = order;
+  const level = lead ? levelOf(lead[0]) : null;
+  return {
+    weights,
+    lead: level ? lead[1] : null,
+    level,
+    blend: !!(level && second && second[0] >= BLEND_MIN),
+  };
+}
+
+function previewText(seg) {
+  if (!seg.directions) return seg.current;
+  const c = choiceAt(seg, mouse.x, mouse.y);
+  return c.lead == null ? seg.original : seg.directions[c.lead][c.level];
+}
+
+addEventListener("mousemove", (e) => {
+  if (drag) { angle = drag.angle + (e.clientX - drag.x) * 0.006; return; }
+  mouse = { x: e.clientX, y: e.clientY };
+  if (open?.directions) {
+    const c = choiceAt(open, mouse.x, mouse.y);
+    [...petalsEl.children].forEach((el, i) => {
+      el.classList.toggle("lead", i === c.lead);
+      el.querySelector("small").textContent = i === c.lead ? (c.blend ? `${c.level} · blend` : c.level) : "";
+    });
+    renderText();
+  }
+});
+
+addEventListener("click", async (e) => {
+  if (ignoreClick) { ignoreClick = false; return; }
+  if (!open || !open.directions || e.target.closest("#tools")) return;
+  const seg = open;
+  const c = choiceAt(seg, e.clientX, e.clientY);
+  seg.choice = { dx: e.clientX - seg.center.x, dy: e.clientY - seg.center.y, label: c.lead == null ? null : seg.directions[c.lead].label, level: c.level };
+  commitOrder = commitOrder.filter((id) => id !== seg.id);
+  if (c.lead == null) {
+    seg.current = seg.original;
+    seg.choice = null;
+    closeBloom(true);
+    return;
+  }
+  commitOrder.push(seg.id);
+  seg.current = seg.directions[c.lead][c.level];
+  closeBloom(true);
+  if (!c.blend) return;
+  const pulls = c.weights.map((w, i) => ({ label: seg.directions[i].label, weight: w })).filter((p) => p.weight >= LEVELS[0][1]);
+  seg.loading = true; renderText();
+  try {
+    seg.current = (await api("blend", { ...passageOf(seg), pulls })).text;
+    seg.choice.label = pulls.map((p) => p.label).join(" + ");
+  } catch (error) { toast(error.message); }
+  seg.loading = false; renderText();
+});
+
+function closeBloom(keep) {
+  const seg = open;
+  open = null;
+  document.body.classList.remove("open");
+  textEl.style.setProperty("--lift", "0px");
+  hintEl.style.opacity = 1;
+  if (seg && !keep && !seg.choice && seg.current === seg.original) removeSeg(seg.id);
+  layoutPetals();
+  renderText();
+  renderHint();
+}
+
+function removeSeg(id) {
+  const i = pieces.findIndex((p) => p.kind === "seg" && p.id === id);
+  if (i < 0) return;
+  pieces[i] = { kind: "plain", text: segs[id].current };
+  delete segs[id];
+  const merged = [];
+  for (const p of pieces) {
+    const last = merged[merged.length - 1];
+    if (p.kind === "plain" && last?.kind === "plain") last.text += p.text;
+    else merged.push({ ...p });
+  }
+  pieces = merged;
+}
+
+$("again").addEventListener("click", () => {
+  if (!open?.directions) return;
+  const custom = open.directions.filter((d) => d.kind === "custom");
+  const seen = open.directions.map((d) => d.label);
+  fetchDirections(open, seen).then(() => { if (open?.directions) { open.directions = [...open.directions, ...custom].slice(0, MAX_PETALS); layoutPetals(); } });
+});
+
+$("ownBtn").addEventListener("click", () => { ownEl.classList.add("show"); ownEl.focus(); });
+ownEl.addEventListener("keydown", async (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") { ownEl.classList.remove("show"); return; }
+  if (e.key !== "Enter" || !ownEl.value.trim() || !open?.directions) return;
+  const seg = open, label = ownEl.value.trim();
+  ownEl.value = ""; ownEl.classList.remove("show");
+  hintEl.textContent = `listening for “${label}”…`;
+  try {
+    const { direction } = await api("custom", { ...passageOf(seg), label });
+    const custom = { ...direction, kind: "custom" };
+    seg.directions = seg.directions.length >= MAX_PETALS ? [...seg.directions.slice(0, MAX_PETALS - 1), custom] : [...seg.directions, custom];
+    if (open === seg) layoutPetals();
+  } catch (error) { toast(error.message); }
+  renderHint();
+});
+
+addEventListener("keydown", (e) => {
+  if (document.body.classList.contains("editing")) return;
+  if (e.key === "Escape") {
+    if (open) closeBloom(false);
+    else if (mode === "sky") { mode = "edit"; document.body.classList.remove("sky"); renderHint(); }
+  }
+  if (e.key === "Enter" && !open && mode === "edit") {
+    if (!commitOrder.length) return toast("shape a passage first");
+    mode = "sky"; document.body.classList.add("sky"); renderHint();
+  }
+});
+
+$("edit").addEventListener("click", () => {
+  const editor = $("editor");
+  if (document.body.classList.toggle("editing")) {
+    editor.value = fullText();
+    editor.focus();
+    $("edit").textContent = "done";
+  } else {
+    pieces = [{ kind: "plain", text: editor.value.trim() || SAMPLE }];
+    segs = {}; commitOrder = [];
+    $("edit").textContent = "edit text";
+    renderText();
+  }
+});
+
+addEventListener("mousedown", (e) => { if (mode === "sky") drag = { x: e.clientX, angle }; });
+addEventListener("mouseup", () => { drag = null; });
+
+function frame(t) {
+  const time = t / 1000;
+  skyT += ((mode === "sky" ? 1 : 0) - skyT) * 0.05;
+  if (mode === "sky" && !drag) angle += 0.0025;
+  ctx.clearRect(0, 0, W, H);
+  for (const d of dust) {
+    ctx.fillStyle = `rgba(235,231,222,${0.05 + 0.06 * Math.sin(time * 0.6 + d.p) ** 2})`;
+    ctx.beginPath(); ctx.arc(d.x * W, d.y * H, d.r, 0, 6.28); ctx.fill();
+  }
+  if (skyT > 0.01) drawConstellation(time);
+  if (skyT < 0.99) {
+    for (const seg of Object.values(segs)) if (seg !== open && seg.choice && seg.center) drawResting(seg, 1 - skyT, time);
+    if (open) drawBloom(open, time);
+  }
+  requestAnimationFrame(frame);
+}
+
+function drawResting(seg, alpha, time) {
+  const last = segRects(seg).at(-1);
+  if (!last) return;
+  const s = 9 / R, x = last.right + 14, y = last.top + last.height * 0.42;
+  if (seg.directions) petalAngles(seg.directions.length).forEach((a) => dot(x + Math.cos(a) * R * s, y + Math.sin(a) * R * s, 0.8, 0.22 * alpha));
+  dot(x + seg.choice.dx * s, y + seg.choice.dy * s, 1.3, 0.75 * alpha);
+}
+
+function drawBloom(seg, time) {
+  const { x, y } = seg.center;
+  const last = segRects(seg).at(-1);
+  if (last) {
+    const ax = clamp(x, last.left, last.right), ay = last.bottom + 4;
+    if (Math.hypot(ax - x, ay - y) > R + 10) {
+      const k = 1 - (R + 10) / Math.hypot(ax - x, ay - y);
+      ctx.strokeStyle = "rgba(233,203,139,0.18)"; ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax + (x - ax) * k, ay + (y - ay) * k); ctx.stroke();
+    }
+  }
+  if (!seg.directions) {
+    for (let i = 0; i < 4; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 2, pulse = 0.25 + 0.25 * Math.sin(time * 3 + i);
+      dot(x + Math.cos(a) * R, y + Math.sin(a) * R, 2, pulse);
+    }
+    dot(x, y, 1.5, 0.5);
+    return;
+  }
+  const c = choiceAt(seg, mouse.x, mouse.y);
+  ctx.strokeStyle = "rgba(235,231,222,0.06)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.arc(x, y, R, 0, 6.28); ctx.stroke();
+  petalAngles(seg.directions.length).forEach((a, i) => {
+    const px = x + Math.cos(a) * R, py = y + Math.sin(a) * R, w = c.weights[i];
+    if (w > 0.02) {
+      const g = ctx.createLinearGradient(mouse.x, mouse.y, px, py);
+      g.addColorStop(0, `rgba(233,203,139,${0.7 * w})`);
+      g.addColorStop(1, `rgba(233,203,139,${0.08 * w})`);
+      ctx.strokeStyle = g; ctx.lineWidth = 0.6 + 1.4 * w;
+      ctx.beginPath(); ctx.moveTo(mouse.x, mouse.y); ctx.lineTo(px, py); ctx.stroke();
+    }
+    ring(px, py, 4 + 4 * w, 0.3 + 0.7 * w);
+  });
+  dot(x, y, 1.5, 0.45);
+  ring(x, y, DEAD_ZONE, 0.08);
+  const strength = Math.max(0, ...c.weights);
+  star(mouse.x, mouse.y, 1.6 + 1.4 * strength, 0.9, time);
+  ring(mouse.x, mouse.y, 6 + 16 * strength, 0.35);
+}
+
+function drawConstellation(time) {
+  const e = skyT * skyT * (3 - 2 * skyT);
+  const pts = commitOrder.map((id, k) => {
+    const seg = segs[id];
+    if (!seg?.choice) return null;
+    const restX = seg.center.x + seg.choice.dx * 0.32, restY = seg.center.y + seg.choice.dy * 0.32;
+    const X = (restX - W / 2) * 0.9 + seg.choice.dx * 0.8, Y = (restY - H / 2) * 0.7 + seg.choice.dy * 0.8;
+    const Z = (k - (commitOrder.length - 1) / 2) * 190;
+    const x1 = X * Math.cos(angle) + Z * Math.sin(angle), z1 = -X * Math.sin(angle) + Z * Math.cos(angle);
+    const p = 1000 / (1000 + z1);
+    return { x: restX + (W / 2 + x1 * p - restX) * e, y: restY + (H * 0.38 + Y * p - restY) * e, p, label: seg.choice.label, level: seg.choice.level };
+  }).filter(Boolean);
+  ctx.lineWidth = 0.7;
+  for (let i = 1; i < pts.length; i++) {
+    ctx.strokeStyle = `rgba(235,231,222,${0.35 * e})`;
+    ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+  }
+  ctx.font = "300 11px 'IBM Plex Mono', monospace";
+  ctx.textAlign = "center";
+  for (const pt of pts) {
+    star(pt.x, pt.y, 2.4 * pt.p, Math.min(1, 0.5 + 0.5 * pt.p) * e, time);
+    ctx.fillStyle = `rgba(235,231,222,${0.55 * e * pt.p})`;
+    ctx.fillText(pt.label ?? "", pt.x, pt.y - 18 * pt.p);
+  }
+}
+
+function dot(x, y, r, a) { ctx.fillStyle = `rgba(235,231,222,${a})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.28); ctx.fill(); }
+function ring(x, y, r, a) { ctx.strokeStyle = `rgba(235,231,222,${a})`; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.28); ctx.stroke(); }
+function star(x, y, size, alpha, t) {
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, size * 9);
+  glow.addColorStop(0, `rgba(244,239,228,${0.3 * alpha})`);
+  glow.addColorStop(1, "rgba(244,239,228,0)");
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, size * 9, 0, 6.28); ctx.fill();
+  dot(x, y, size, alpha * (0.85 + 0.15 * Math.sin(t * 2.1)));
+  ctx.strokeStyle = `rgba(244,239,228,${0.3 * alpha})`; ctx.lineWidth = 0.6;
+  ctx.beginPath(); ctx.moveTo(x - size * 3.2, y); ctx.lineTo(x + size * 3.2, y); ctx.moveTo(x, y - size * 3.2); ctx.lineTo(x, y + size * 3.2); ctx.stroke();
+}
+
+function diffWords(a, b) {
+  const A = a.split(/(\s+)/), B = b.split(/(\s+)/);
+  const n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0;
+  while (j < m) {
+    if (i < n && A[i] === B[j]) { out.push({ text: B[j], changed: false }); i++; j++; }
+    else if (i < n && L[i + 1][j] >= L[i][j + 1]) i++;
+    else { out.push({ text: B[j], changed: /\S/.test(B[j]) }); j++; }
+  }
+  return out;
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function escapeHtml(s) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }
+</script>
+</body>
+</html>
