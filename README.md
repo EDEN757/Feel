@@ -1,4 +1,4 @@
-# feeling
+# feel
 
 Steer your writing by meaning. Select some words, and a ring opens around the screen: each arc is a direction the passage could take, and the further you move toward it, the stronger the change. You see the text change while you move.
 

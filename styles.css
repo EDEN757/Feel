@@ -91,8 +91,8 @@ dialog menu button:hover, dialog menu button[value="save"] { color: var(--fg); }
 #docForm menu { display: flex; justify-content: flex-end; gap: 18px; margin: 0; padding: 0; }
 
 #start { display: none; position: relative; z-index: 2; }
-body.empty:not(.editing) #start { display: block; }
-body.empty #text, body.empty #hint, body.empty:not(.editing) #edit, body.empty #copy { display: none; }
+body.home:not(.editing) #start { display: block; }
+body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy { display: none; }
 
 #hero { position: relative; min-height: 88vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
 #hero h1 { font: 500 16px var(--mono); margin: 0; }
@@ -123,3 +123,7 @@ body.empty #text, body.empty #hint, body.empty:not(.editing) #edit, body.empty #
 body.demo #top, body.demo #refsTab { display: none; }
 html:has(body.demo) { overflow: hidden; }
 body.demo #text { padding: 17vh 0 0; }
+#home { color: var(--fg); font-weight: 500; margin: 0; }
+#top #home { color: var(--fg); margin-left: 0; }
+#home:hover { text-decoration: underline; text-underline-offset: 4px; }
+#hero menu button[hidden] { display: none; }

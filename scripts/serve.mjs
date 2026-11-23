@@ -16,4 +16,4 @@ createServer(async (request, response) => {
   if (!file) return response.writeHead(404).end("not found")
   response.writeHead(200, { "content-type": TYPES[extname(path)] ?? "application/octet-stream", "cache-control": "no-store" })
   response.end(file)
-}).listen(PORT, "127.0.0.1", () => console.log(`feeling on http://localhost:${PORT}`))
+}).listen(PORT, "127.0.0.1", () => console.log(`feel on http://localhost:${PORT}`))

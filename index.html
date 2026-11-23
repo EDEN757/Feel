@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>feeling</title>
+<title>feel</title>
 <meta name="description" content="Steer your writing by meaning: select words, move toward what you mean." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,7 +14,7 @@
 <canvas id="screen"></canvas>
 
 <header id="top">
-  <span id="status"><b>feeling</b></span>
+  <span><button id="home" title="back to the front page">feel</button><span id="status"></span></span>
   <span>
     <button id="documents">documents</button>
     <button id="live"></button>
@@ -26,9 +26,10 @@
 
 <section id="start">
   <div id="hero">
-    <h1>feeling</h1>
+    <h1>feel</h1>
     <p>Steer your writing by meaning: select words, then move toward what you mean.</p>
     <menu>
+      <button id="startContinue" hidden>continue your text</button>
       <button id="startOwn">paste your own text</button>
       <button id="startSample">try a sample letter</button>
     </menu>
@@ -49,7 +50,7 @@
       <li data-step="shorter"><b>←</b> makes it shorter</li>
       <li data-step="write"><b>click</b> between words to write</li>
     </ol>
-    <iframe id="demo" title="feeling, running on sample text"></iframe>
+    <iframe id="demo" title="feel, running on sample text"></iframe>
     <p class="note">Sample data, canned replies. With your own text and a Cerebras key, a real model answers.</p>
   </div>
 </section>
@@ -81,15 +82,15 @@
 
 <dialog id="keyDialog">
   <form method="dialog">
-    <h2>go live with Cerebras</h2>
-    <p>Without a key, feeling runs on a simulator with canned rewrites. With your own Cerebras API key it uses a real model.</p>
+    <h2 id="keyTitle">go live with Cerebras</h2>
+    <p>With your own Cerebras API key, a real model answers. Without one, feel runs on a simulator: canned replies that only fit the sample letter.</p>
     <p>The key is stored only in this browser and sent only to api.cerebras.ai.</p>
     <label>API key <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="csk-…" /></label>
     <label>model <input id="modelInput" autocomplete="off" spellcheck="false" /></label>
     <menu>
-      <button value="remove">remove key</button>
-      <button value="cancel">cancel</button>
-      <button value="save">save</button>
+      <button value="remove" id="keyRemove">remove key</button>
+      <button value="cancel" id="keyCancel">cancel</button>
+      <button value="save" id="keySave">save</button>
     </menu>
   </form>
 </dialog>

@@ -28,6 +28,8 @@ const DEMO_TEXT = SAMPLE.split("\n\n").slice(1, 3).join("\n\n");
 if (DEMO) { settings.simulate = true; document.body.classList.add("demo"); }
 let text = DEMO ? DEMO_TEXT : stored();
 const undone = { past: [], future: [] };
+/** The front page shows when there is no text yet, or when the name in the corner is clicked. */
+let home = !text;
 let seg = null;
 let changes = 0;
 let mouse = { x: -1, y: -1 };
@@ -107,9 +109,11 @@ function remember() {
 
 function render() {
   remember();
-  document.body.classList.toggle("empty", !text);
+  if (!text && !document.body.classList.contains("editing")) home = true;
+  document.body.classList.toggle("home", home);
+  $("startContinue").hidden = !text;
   renderText();
-  statusEl.innerHTML = `<b>feeling</b>${changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : ""}`;
+  statusEl.textContent = changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : "";
   document.body.classList.toggle("open", isOpen());
   const set = currentSet();
   if (!seg || seg.done) hintEl.innerHTML = "<b>select</b> words to reshape them  ·  <b>click</b> between words to write there  ·  scroll to read";
@@ -727,25 +731,51 @@ askInput.addEventListener("keydown", (e) => {
 });
 askedEl.addEventListener("mousedown", (e) => { e.preventDefault(); clearPrompt(); });
 
-/** The plain editor for pasting or typing the text. Leaving it empty brings back the start screen. */
-function setEditing(on) {
+/** The plain editor for pasting or typing the text. Leaving it empty brings back the front page. */
+function setEditing(on, starting = text) {
   const editor = $("editor");
   document.body.classList.toggle("editing", on);
   $("edit").textContent = on ? "done" : "edit text";
   if (on) {
     forget();
-    editor.value = text;
+    editor.value = starting;
     editor.focus();
   } else {
-    setText(editor.value.trim());
+    setText(editor.value.trim() || text);
     changes = 0;
+    home = !text;
     render();
   }
 }
 
+function leaveHome() {
+  home = false;
+  render();
+  scrollTo(0, 0);
+}
+
+/** The first time someone starts without a key, asks whether they want a real model or the simulator. */
+const CHOSEN_STORAGE = "feeling-mode-chosen";
+let afterChoice = null;
+function begin(action) {
+  let chosen = true;
+  try { chosen = !!localStorage.getItem(CHOSEN_STORAGE); } catch {}
+  if (settings.apiKey || chosen) return action();
+  afterChoice = action;
+  openKeyDialog(true);
+}
+
 $("edit").addEventListener("click", () => setEditing(!document.body.classList.contains("editing")));
-$("startOwn").addEventListener("click", () => setEditing(true));
-$("startSample").addEventListener("click", () => { setText(SAMPLE); render(); scrollTo(0, 0); });
+$("home").addEventListener("click", () => {
+  if (document.body.classList.contains("editing")) setEditing(false);
+  forget();
+  home = true;
+  render();
+  scrollTo(0, 0);
+});
+$("startContinue").addEventListener("click", () => begin(leaveHome));
+$("startOwn").addEventListener("click", () => begin(() => setEditing(true, "")));
+$("startSample").addEventListener("click", () => begin(() => { setText(SAMPLE); leaveHome(); }));
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(text); toast("copied"); } catch { toast("could not copy: select the text and copy it by hand"); }
 });
@@ -756,16 +786,27 @@ addEventListener("keydown", (e) => {
   undo(!e.shiftKey);
 });
 const keyDialog = $("keyDialog");
-$("live").addEventListener("click", () => {
+/** As a first-time choice the dialog offers the simulator instead of "cancel"; from the top bar it manages the key. */
+function openKeyDialog(asChoice) {
+  $("keyTitle").textContent = asChoice ? "a real model, or the simulator?" : "go live with Cerebras";
+  $("keyCancel").textContent = asChoice ? "use the simulator" : "cancel";
+  $("keySave").textContent = asChoice ? "use this key" : "save";
+  $("keyRemove").hidden = asChoice;
   $("keyInput").value = settings.apiKey;
   $("modelInput").value = settings.model;
   keyDialog.returnValue = "";
   keyDialog.showModal();
-});
+}
+$("live").addEventListener("click", () => openKeyDialog(false));
 keyDialog.addEventListener("close", () => {
   if (keyDialog.returnValue === "save") settings.save({ apiKey: $("keyInput").value, model: $("modelInput").value });
   if (keyDialog.returnValue === "remove") settings.save({ apiKey: "", model: "" });
   renderLive();
+  if (!afterChoice) return;
+  const action = afterChoice;
+  afterChoice = null;
+  try { localStorage.setItem(CHOSEN_STORAGE, "yes"); } catch {}
+  action();
 });
 renderLive();
 function renderLive() { $("live").textContent = isLive() ? `live · ${settings.model}` : "simulator · add key"; }
