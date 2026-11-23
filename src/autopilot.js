@@ -10,7 +10,7 @@ const SECOND = "I learned to work with people from different fields"
 const LONG = "I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app."
 const STOPPED = Symbol("stopped")
 /** Every pause and movement is stretched by this much, so there is time to read what changed. */
-const PACE = 1.2
+const PACE = 1.14
 
 /** One interaction each. `it` is the set of gestures built in `startAutopilot`. */
 const CLIPS = {
@@ -27,17 +27,22 @@ const CLIPS = {
 
   async combine(it) {
     await it.select(FIRST)
-    await it.toRing(1, 2, 800)
+    await it.toRing(0, 2, 800, 0.35)
     await it.wait(300)
     it.click()
     await it.wait(700)
-    await it.toRing(4, 2, 1000)
+    await it.toRing(2, 3, 1000, 0.7)
     await it.settled()
-    await it.wait(1100)
+    await it.wait(900)
+    it.click()
+    await it.wait(600)
+    await it.toRing(4, 1, 1000, 0.4)
+    await it.settled()
+    await it.wait(900)
     it.click()
     await it.wait(300)
-    await it.toRing(4, 0, 600)
-    await it.wait(1200)
+    await it.toRing(5, 0, 600)
+    await it.wait(1300)
     it.press("Enter")
     await it.wait(2600)
   },
@@ -97,7 +102,7 @@ const CLIPS = {
 /**
  * Plays one clip on a loop while the front page says it is in view.
  * @param app what a clip needs from the app: rects(start, end) the on-screen boxes of a stretch of text;
- *   select(start, end) and writeAt(offset) to open the ring; point(index, level) a spot on the ring;
+ *   select(start, end) and writeAt(offset) to open the ring; point(index, level, across) a spot on the ring;
  *   isOpen(), isBusy(), text(); reset() back to the untouched sample.
  */
 export function startAutopilot(app, name) {
@@ -179,7 +184,7 @@ export function startAutopilot(app, name) {
       await wait(500)
     }
 
-    return { app, wait, press, settled, moveTo, select, type, click: () => send("mousedown"), toRing: (index, level, ms) => moveTo(...app.point(index, level), ms) }
+    return { app, wait, press, settled, moveTo, select, type, click: () => send("mousedown"), toRing: (index, level, ms, across) => moveTo(...app.point(index, level, across), ms) }
   }
 
   /** Paints a selection over the given boxes. Drawn by hand, because a frame without focus shows no real selection. */

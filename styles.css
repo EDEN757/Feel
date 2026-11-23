@@ -157,3 +157,10 @@ body.clip #hint { display: none; }
 body.clip #text { padding: 138px 0 0; }
 body.clip[data-clip="shorter"] #text { padding-top: 108px; }
 body.clip:not([data-clip="ask"]) #ask { display: none !important; }
+
+#clips figcaption { margin-top: 14px; font-size: 15px; }
+#tour { padding-left: 0; padding-right: 0; padding-bottom: 0; }
+#tour .note { padding: 14px 24px 22px; }
+#demo { width: 100%; height: 100vh; border: 0; border-top: 1px solid #2a2a2a; border-bottom: 1px solid #2a2a2a; }
+body.demo:not(.clip) { font-size: 16px; }
+body.demo:not(.clip) #text { padding-top: 19vh; }

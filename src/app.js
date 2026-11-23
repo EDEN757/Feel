@@ -831,10 +831,10 @@ if (CLIP) {
     isBusy: () => !!seg && (seg.waiting || seg.asking || seg.loading),
     select(start, end) { forget(); open({ mode: "edit", start, end, original: text.slice(start, end) }); },
     writeAt(offset) { forget(); open({ mode: "write", start: offset, end: offset, original: "" }); },
-    /** The middle of a strength band on one arc of the ring. */
-    point(index, level) {
+    /** A spot in a strength band on one arc of the ring; `across` runs from one side of the arc (0) to the other (1). */
+    point(index, level, across = 0.5) {
       const count = currentSet().length;
-      return ellipsePoint(INNER + ((OUTER - INNER) * (level - 0.5)) / 3, ((index + 0.5) * 360) / count);
+      return ellipsePoint(INNER + ((OUTER - INNER) * (level - 0.5)) / 3, ((index + across) * 360) / count);
     },
     /** Where a stretch of the text sits on screen. Closes any open passage first, so the text is one plain run. */
     rects(start, end) {
