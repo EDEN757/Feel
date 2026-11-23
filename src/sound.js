@@ -2,8 +2,9 @@
 export function createSound() {
   let ac = null, out = null, muted = false;
   try { muted = localStorage.getItem("feeling-sound") === "off"; } catch {}
+  let silenced = false;
   function ready() {
-    if (muted) return false;
+    if (muted || silenced) return false;
     if (!ac) { ac = new AudioContext(); out = ac.createGain(); out.gain.value = 0.7; out.connect(ac.destination); }
     ac.resume();
     return true;
@@ -39,6 +40,8 @@ export function createSound() {
     crack: () => blip(1600, 0.03, 0.05, 0, "square"),
     shatter: (pieces) => { noise(0.25, 0.35, 2200); noise(0.15, 0.5, 700); blip(220, 0.06, 0.4, 0, "sawtooth", 0.3); },
     grow: () => blip(330, 0.04, 0.35, 0, "sine", 2),
+    /** Quiet without changing the saved preference, for when the tour plays by itself. */
+    silence(on) { silenced = on; },
     toggle() { muted = !muted; try { localStorage.setItem("feeling-sound", muted ? "off" : "on"); } catch {} },
   };
 }

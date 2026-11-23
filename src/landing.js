@@ -1,37 +1,60 @@
-/** The front page: the creator's name drawn in dots that scatter from the cursor, and the tour's checklist. */
+/** The front page: words drawn as dot-matrix displays that scatter from the cursor, and the tour's checklist. */
 
-const NAME = "edoardo schiatti"
-const GAP = 2
-const REACH = 30
+const REACH = 34
 
-const canvas = document.querySelector("#dotName canvas")
+/** A 5×7 dot-matrix face, only the letters the page shows. */
+const GLYPHS = {
+  D: ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
+  E: ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
+  F: ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
+  L: ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
+  N: ["10001", "11001", "10101", "10011", "10001", "10001", "10001"],
+}
+
 const steps = document.querySelector("#steps")
-
 const demo = document.querySelector("#demo")
 const isDemo = new URLSearchParams(location.search).has("demo")
 
-if (canvas && !isDemo) document.fonts.ready.then(startDots)
-
-/** The tour is the app itself in a frame; it loads only once it scrolls near, and never inside itself. */
-if (demo && !isDemo) {
-  const watcher = new IntersectionObserver(([entry]) => {
-    if (!entry.isIntersecting) return
-    demo.src = "?demo"
-    watcher.disconnect()
-  }, { rootMargin: "300px" })
-  watcher.observe(demo)
+if (!isDemo) {
+  for (const canvas of document.querySelectorAll("canvas[data-word]")) drawWord(canvas, canvas.dataset.word, Number(canvas.dataset.cell))
+  if (demo) watchDemo()
 }
 
 addEventListener("message", (event) => {
-  if (event.origin !== location.origin || typeof event.data?.feeling !== "string") return
-  steps?.querySelector(`[data-step="${CSS.escape(event.data.feeling)}"]`)?.classList.add("done")
+  if (event.origin !== location.origin || !steps) return
+  const { feeling, feelingNow } = event.data ?? {}
+  if (typeof feeling === "string") steps.querySelector(`[data-step="${CSS.escape(feeling)}"]`)?.classList.add("done")
+  if (feelingNow !== undefined) for (const step of steps.children) step.classList.toggle("now", step.dataset.step === feelingNow)
 })
 
-function startDots() {
+/** The tour is the app itself in a frame. It loads once it scrolls near, never inside itself, and plays only while in view. */
+function watchDemo() {
+  const loader = new IntersectionObserver(([entry]) => {
+    if (!entry.isIntersecting) return
+    demo.src = "?demo"
+    loader.disconnect()
+  }, { rootMargin: "300px" })
+  loader.observe(demo)
+
+  let inView = false
+  const tell = () => demo.contentWindow?.postMessage({ feelingPlay: inView }, location.origin)
+  new IntersectionObserver(([entry]) => { inView = entry.intersectionRatio > 0.45; tell() }, { threshold: [0, 0.45, 1] }).observe(demo)
+  demo.addEventListener("load", () => setTimeout(tell, 400))
+}
+
+function drawWord(canvas, word, cell) {
   const ctx = canvas.getContext("2d")
   const dpr = devicePixelRatio || 1
-  const dots = dotsOf(NAME)
-  const width = Math.max(...dots.map((dot) => dot.homeX)) + 12, height = 44
+  const margin = cell * 2
+  const dots = []
+  ;[...word.toUpperCase()].forEach((letter, index) => {
+    GLYPHS[letter]?.forEach((row, y) => [...row].forEach((on, x) => {
+      if (on !== "1") return
+      const homeX = margin + (index * 6 + x) * cell, homeY = margin + y * cell
+      dots.push({ homeX, homeY, x: homeX, y: homeY, vx: 0, vy: 0, phase: index * 0.9 + y * 0.35 })
+    }))
+  })
+  const width = margin * 2 + (word.length * 6 - 1) * cell, height = margin * 2 + 7 * cell
   canvas.style.width = `${width}px`
   canvas.style.height = `${height}px`
   canvas.width = width * dpr
@@ -45,6 +68,7 @@ function startDots() {
   })
   canvas.addEventListener("mouseleave", () => (mouse = null))
 
+  const size = cell * 0.72
   requestAnimationFrame(function frame(t) {
     requestAnimationFrame(frame)
     if (!canvas.offsetParent) return
@@ -62,31 +86,9 @@ function startDots() {
       dot.vy = (dot.vy + (dot.homeY - dot.y) * 0.06) * 0.86
       dot.x += dot.vx
       dot.y += dot.vy
-      const away = Math.min(1, Math.hypot(dot.x - dot.homeX, dot.y - dot.homeY) / 14)
-      const depth = 0.5 + 0.5 * Math.sin(t / 900 + dot.phase)
-      const size = 1.5 + away * 1.4
-      ctx.fillStyle = `rgba(255,255,255,${0.82 + 0.18 * depth})`
-      ctx.fillRect(dot.x - size / 2, dot.y - size / 2, size, size)
+      const scan = 0.5 + 0.5 * Math.sin(t / 700 - dot.phase)
+      ctx.fillStyle = `rgba(255,255,255,${0.7 + 0.3 * scan})`
+      ctx.fillRect(dot.x, dot.y, size, size)
     }
   })
-}
-
-/** Samples the name, drawn off-screen, into a grid of dots. */
-function dotsOf(name) {
-  const scratch = document.createElement("canvas")
-  scratch.width = 520
-  scratch.height = 44
-  const ctx = scratch.getContext("2d", { willReadFrequently: true })
-  ctx.font = "500 26px 'IBM Plex Mono', ui-monospace, monospace"
-  ctx.textBaseline = "middle"
-  ctx.fillStyle = "#fff"
-  ctx.fillText(name, 6, 23)
-  const pixels = ctx.getImageData(0, 0, scratch.width, scratch.height).data
-  const dots = []
-  for (let y = 0; y < scratch.height; y += GAP) {
-    for (let x = 0; x < scratch.width; x += GAP) {
-      if (pixels[(y * scratch.width + x) * 4 + 3] > 120) dots.push({ homeX: x, homeY: y, x, y, vx: 0, vy: 0, phase: x * 0.05 + y * 0.2 })
-    }
-  }
-  return dots
 }

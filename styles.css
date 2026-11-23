@@ -123,8 +123,15 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 
 body.demo #top, body.demo #refsTab { display: none; }
 html:has(body.demo) { overflow: hidden; }
-body.demo #text { padding: 17vh 0 0; }
+body.demo #text { padding: 11vh 0 0; }
 #home { color: var(--fg); font-weight: 500; margin: 0; }
 #top #home { color: var(--fg); margin-left: 0; }
 #home:hover { text-decoration: underline; text-underline-offset: 4px; }
 #hero menu button[hidden] { display: none; }
+#hero h1 { line-height: 0; margin-bottom: 6px; }
+#steps li.now { color: var(--fg); }
+#steps li.now::before { content: "▸ "; color: var(--fg); }
+#ghost { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border: 1.5px solid var(--fg); border-radius: 50%; z-index: 7; pointer-events: none; display: none; }
+#ghost.show { display: block; }
+#demoNote { position: fixed; top: 16px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--mid); z-index: 6; pointer-events: none; }
+body.open #demoNote { opacity: .55; }

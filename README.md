@@ -12,7 +12,7 @@ npm start
 
 Then open http://localhost:4317. There is nothing to install and no backend: `npm start` only serves the files, and any static host works.
 
-The front page has a tour: the app itself, running on sample text, with a checklist that ticks as you try things.
+The front page has a tour: the app itself on sample text, playing through each interaction on its own. Move your cursor over it and it is yours to try; it starts again when you leave.
 
 Out of the box it runs on a **simulator** with canned rewrites, which is enough to try the interaction on the sample letter. To use a real model, click **simulator · add key** and paste your own [Cerebras](https://cloud.cerebras.ai) API key. The key is stored only in your browser and sent only to `api.cerebras.ai`.
 
@@ -39,7 +39,8 @@ The interface asks ahead of need, in the way [Spaceship](https://github.com/chua
 ```
 index.html, styles.css   the page
 src/app.js               the ring: selection, aiming, pins, drawing
-src/landing.js           the front page: the name in dots, the tour's checklist
+src/landing.js           the front page: dot-matrix names, the tour's checklist
+src/autopilot.js         the tour playing itself with a ghost cursor
 src/documents.js         your reference documents, kept in the browser
 src/diff.js, sound.js    word-level diff; synthesized sounds
 src/sample.js            the sample letter and placeholder documents

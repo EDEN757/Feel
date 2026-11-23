@@ -1,3 +1,4 @@
+import { pilot, startAutopilot } from "./autopilot.js";
 import { diffWords } from "./diff.js";
 import "./landing.js";
 import { documents } from "./documents.js";
@@ -97,7 +98,7 @@ function undo(back) {
 
 /** Tells the front page what just happened, so its tour can tick the step off. */
 function notify(step) {
-  if (DEMO) parent.postMessage({ feeling: step }, location.origin);
+  if (DEMO && !pilot.running) parent.postMessage({ feeling: step }, location.origin);
 }
 
 /** Keeps the text for the next visit. A passage still being shaped is not part of it until it is saved. */
@@ -816,6 +817,42 @@ function renderSound() { $("sound").textContent = sound.muted ? "sound off" : "s
 function renderPanel() {
   const pinned = new Set(seg?.pins.filter((p) => p.kind === "ref").map((p) => p.text) ?? []);
   for (const p of refsEl.querySelectorAll(".doc p")) p.classList.toggle("pinned", pinned.has(p.textContent));
+}
+
+/* ---------- the tour ---------- */
+
+if (DEMO) {
+  startAutopilot({
+    text: () => text,
+    isOpen,
+    isBusy: () => !!seg && (seg.waiting || seg.asking || seg.loading),
+    select(start, end) { forget(); open({ mode: "edit", start, end, original: text.slice(start, end) }); },
+    writeAt(offset) { forget(); open({ mode: "write", start: offset, end: offset, original: "" }); },
+    /** The middle of a strength band on one arc of the ring. */
+    point(index, level) {
+      const count = currentSet().length;
+      return ellipsePoint(INNER + ((OUTER - INNER) * (level - 0.5)) / 3, ((index + 0.5) * 360) / count);
+    },
+    /** Where a stretch of the text sits on screen. Closes any open passage first, so the text is one plain run. */
+    rects(start, end) {
+      forget();
+      render();
+      const node = textEl.firstChild.firstChild, range = document.createRange();
+      range.setStart(node, start);
+      range.setEnd(node, end);
+      return [...range.getClientRects()];
+    },
+    reset() {
+      if (seg) clearTimeout(seg.fadeTimer);
+      seg = null; aim = null; changes = 0;
+      text = DEMO_TEXT;
+      undone.past = []; undone.future = [];
+      askInput.value = "";
+      refsEl.classList.remove("show");
+      sound.silence(pilot.running);
+      render();
+    },
+  });
 }
 
 /* ---------- your documents ---------- */
