@@ -21,12 +21,43 @@ const isDemo = new URLSearchParams(location.search).has("demo")
 if (!isDemo) {
   for (const canvas of document.querySelectorAll("canvas[data-word]")) drawWord(canvas)
   for (const frame of document.querySelectorAll("iframe[data-frame]")) watchFrame(frame)
+  const track = document.querySelector("#clips .track")
+  if (track) lineUp(track)
 }
 
 addEventListener("message", (event) => {
   if (event.origin !== location.origin || typeof event.data?.feeling !== "string") return
   steps?.querySelector(`[data-step="${CSS.escape(event.data.feeling)}"]`)?.classList.add("done")
 })
+
+/**
+ * The clips sit in one line with a single clip in the spotlight, centred and at full strength; the rest are dimmed.
+ * The line moves on when the spotlit clip finishes, or when a clip is clicked.
+ */
+function lineUp(track) {
+  const figures = [...track.children]
+  const frameOf = (figure) => figure.querySelector("iframe")
+  let spot = 0
+
+  const centre = () => {
+    const figure = figures[spot]
+    track.style.transform = `translateX(${track.parentElement.clientWidth / 2 - (figure.offsetLeft + figure.offsetWidth / 2)}px)`
+  }
+  const show = (index) => {
+    spot = (index + figures.length) % figures.length
+    figures.forEach((figure, i) => figure.classList.toggle("spot", i === spot))
+    centre()
+    frameOf(figures[spot]).contentWindow?.postMessage({ feelingPlay: true }, location.origin)
+  }
+
+  figures.forEach((figure, i) => figure.addEventListener("click", () => show(i === spot ? spot + 1 : i)))
+  addEventListener("message", (event) => {
+    if (event.origin !== location.origin || !event.data?.feelingClipDone) return
+    if (event.source === frameOf(figures[spot]).contentWindow) show(spot + 1)
+  })
+  new ResizeObserver(centre).observe(track.parentElement)
+  show(0)
+}
 
 /**
  * Each frame is the app itself. It loads once it scrolls near and never inside itself.

@@ -138,8 +138,14 @@ body.demo { font-size: 15px; }
 
 #clips { padding: 0 max(24px, 5vw) 14vh; display: grid; justify-items: center; gap: 22px; }
 #clips h2 { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mid); margin: 0; }
-#clips .grid { width: min(1180px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap: 34px 28px; }
-#clips figure { margin: 0; }
+#clips { padding-left: 0; padding-right: 0; grid-template-columns: minmax(0, 1fr); }
+#clips .rail { width: 100%; overflow: hidden; }
+#clips .track { position: relative; display: flex; gap: 36px; width: max-content; transition: transform .9s cubic-bezier(.2,.7,.1,1); }
+#clips figure { margin: 0; width: min(780px, 76vw); cursor: pointer; opacity: .28; filter: grayscale(1); transition: opacity .6s, filter .6s; }
+#clips figure.spot { opacity: 1; filter: none; }
+#clips figure:not(.spot):hover { opacity: .5; }
+#clips .note { margin: 0; font-size: 12px; color: #666; }
+
 .clip { aspect-ratio: 840 / 500; overflow: hidden; border: 1px solid #2a2a2a; background: var(--bg); }
 .clip iframe { border: 0; transform-origin: 0 0; pointer-events: none; display: block; }
 #clips figcaption { margin-top: 10px; font-size: 12px; color: var(--mid); }

@@ -9,6 +9,8 @@ const FIRST = "I think I could help your company"
 const SECOND = "I learned to work with people from different fields"
 const LONG = "I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app."
 const STOPPED = Symbol("stopped")
+/** Every pause and movement is stretched by this much, so there is time to read what changed. */
+const PACE = 1.2
 
 /** One interaction each. `it` is the set of gestures built in `startAutopilot`. */
 const CLIPS = {
@@ -121,6 +123,7 @@ export function startAutopilot(app, name) {
         app.reset()
         await gestures(mine).wait(700)
         await clip(gestures(mine))
+        parent.postMessage({ feelingClipDone: name }, location.origin)
       }
     } catch (error) {
       if (error !== STOPPED) throw error
@@ -129,7 +132,7 @@ export function startAutopilot(app, name) {
 
   function gestures(mine) {
     const alive = () => { if (mine !== run) throw STOPPED }
-    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)).then(alive)
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms * PACE)).then(alive)
     const send = (type) => (document.elementFromPoint(at.x, at.y) ?? document.body).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: at.x, clientY: at.y, button: 0 }))
     const press = (key, target = document.body) => target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }))
     const settled = async () => { while (!app.isOpen() || app.isBusy()) await wait(80) }
@@ -137,7 +140,7 @@ export function startAutopilot(app, name) {
     async function moveTo(x, y, ms = 700) {
       const from = { ...at }, started = performance.now()
       while (true) {
-        const t = Math.min(1, (performance.now() - started) / ms), eased = t * t * (3 - 2 * t)
+        const t = Math.min(1, (performance.now() - started) / (ms * PACE)), eased = t * t * (3 - 2 * t)
         at.x = from.x + (x - from.x) * eased
         at.y = from.y + (y - from.y) * eased
         ghost.style.transform = `translate(${at.x}px, ${at.y}px)`
