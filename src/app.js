@@ -986,7 +986,9 @@ function drawRing(set, t, time) {
     ctx.textAlign = Math.abs(lx - CX) < 30 ? "center" : lx < CX ? "right" : "left";
     ctx.fillStyle = `rgba(255,255,255,${0.45 + 0.55 * g})`;
     ctx.fillText(typed + (typed.length < label.length && typed.length ? "█" : ""), lx, ly + 4);
-    if (g > 0.5 && aim?.level && aim.index === i) ctx.fillText(`${"■".repeat(aim.level)}${"□".repeat(3 - aim.level)} ${names()[aim.level]}`, lx, ly + 22);
+    /* The strength goes on the label's far side from the ring: above it for arcs in the top half, below it otherwise. */
+    const strengthY = ly < CY - RY * 0.3 ? ly - 14 : ly + 22;
+    if (g > 0.5 && aim?.level && aim.index === i) ctx.fillText(`${"■".repeat(aim.level)}${"□".repeat(3 - aim.level)} ${names()[aim.level]}`, lx, strengthY);
   });
 
   for (let i = flashes.length - 1; i >= 0; i--) {
