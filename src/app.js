@@ -372,7 +372,8 @@ async function combine(target, pulls) {
   const pinned = pulls.filter((p) => target.pins.includes(p)), extra = pulls.filter((p) => !target.pins.includes(p));
   const set = currentSet() ?? [];
   if (!extra.length || (extra.length === 1 && !extra[0].partner && set.includes(extra[0].dir))) {
-    const grid = await api("grid", { ...context, refs: refsOf(pinned), pins: weighed(pinned, context.mode), options: set.map((d) => d.label) });
+    const pins = weighed(pinned, context.mode), taken = new Set(pins.map((pin) => pin.label));
+    const grid = await api("grid", { ...context, refs: refsOf(pinned), pins, options: set.map((d) => d.label).filter((label) => !taken.has(label)) });
     const row = extra.length ? grid.options.find((option) => option.label === extra[0].dir.label) : null;
     if (!extra.length) return done(grid.text);
     if (row) return done(row[KEYS[extra[0].level]]);
@@ -390,7 +391,7 @@ async function askFor(query, apply = true) {
   render();
   try {
     const keep = (currentSet() ?? []).map((d) => d.label);
-    const asked = { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, refs: refsOf(target.pins), count: MEANINGS, apply };
+    const asked = { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, refs: refsOf(target.pins), library: documents.all.map((d) => ({ title: d.title, text: d.paragraphs.join(" ") })), count: MEANINGS, apply };
     const { text: result, directions } = await api("prompt", asked);
     if (seg !== target) return;
     notify("ask");

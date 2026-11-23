@@ -34,3 +34,33 @@ test("references are passed to the model word for word", () => {
     assert.ok(user.includes("[notes] Four teams use it."), kind)
   }
 })
+
+test("a typed request carries the writer's documents", () => {
+  const library = [{ title: "thesis", text: "It asked which streets flood first." }]
+  for (const apply of [true, false]) {
+    const { user } = PROMPTS.prompt({ ...payload, mode: "edit", prompt: "connect it to my thesis", library, apply })
+    assert.ok(user.includes("[thesis] It asked which streets flood first."), String(apply))
+  }
+})
+
+test("a long text is cut to its opening and the part around the spot", () => {
+  const paragraphs = Array.from({ length: 60 }, (_, i) => `Paragraph ${i} ${"word ".repeat(60).trim()}.`)
+  const text = paragraphs.join("\n\n"), start = text.indexOf("Paragraph 30"), end = start + 12
+  const { user } = PROMPTS.bloom({ text, start, end })
+  assert.ok(user.length < 6500)
+  assert.ok(user.includes("[[Paragraph 30]]"))
+  assert.ok(user.startsWith("Paragraph 0 "))
+  assert.ok(user.includes("[…]"))
+  assert.ok(user.includes("Paragraph 29 ") && user.includes("Paragraph 31 "))
+  assert.ok(!user.includes("Paragraph 10 ") && !user.includes("Paragraph 50 "))
+})
+
+test("a short text is sent whole", () => {
+  assert.ok(PROMPTS.bloom(payload).user.startsWith("I [[could help]] your company."))
+})
+
+test("the grid asks for nothing extra when every option is pinned", () => {
+  const { user } = PROMPTS.grid({ ...payload, mode: "edit", pins: [{ label: "warmer", weight: 1 }], options: [] })
+  assert.ok(!user.includes("further options"))
+})
+
