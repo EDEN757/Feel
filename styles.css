@@ -105,7 +105,8 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #scrollCue span { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
 @keyframes nudge { 50% { transform: translateY(5px); } }
 #hero footer { position: absolute; bottom: 14px; left: 24px; right: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
-#dotName { display: block; line-height: 0; }
+#dotName { display: flex; align-items: center; gap: 10px; line-height: 0; color: var(--mid); text-decoration: none; }
+#dotName span { line-height: 1; }
 #repoLink { color: var(--mid); text-decoration: none; }
 #repoLink:hover { color: var(--fg); }
 

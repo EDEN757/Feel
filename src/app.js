@@ -111,7 +111,6 @@ function render() {
   remember();
   if (!text && !document.body.classList.contains("editing")) home = true;
   document.body.classList.toggle("home", home);
-  $("startContinue").hidden = !text;
   renderText();
   statusEl.textContent = changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : "";
   document.body.classList.toggle("open", isOpen());
@@ -773,8 +772,7 @@ $("home").addEventListener("click", () => {
   render();
   scrollTo(0, 0);
 });
-$("startContinue").addEventListener("click", () => begin(leaveHome));
-$("startOwn").addEventListener("click", () => begin(() => setEditing(true, "")));
+$("startOwn").addEventListener("click", () => begin(() => setEditing(true)));
 $("startSample").addEventListener("click", () => begin(() => { setText(SAMPLE); leaveHome(); }));
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(text); toast("copied"); } catch { toast("could not copy: select the text and copy it by hand"); }
