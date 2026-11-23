@@ -29,6 +29,7 @@ const LENGTHS = z.object({
   medium: z.string().describe("one full sentence"),
   strong: z.string().describe("a short paragraph of two to four sentences"),
 })
+const PROMPTED = z.object({ text: z.string(), directions: z.array(GRADES.extend({ label: z.string() })) })
 const MOVES = z.object({ directions: z.array(LENGTHS.extend({ label: z.string() })) })
 
 const SYSTEM = `You help a writer shape their own text by its feeling and meaning, not just its wording.
@@ -54,16 +55,6 @@ ${grades}`
     if (MOCK) return mockBloom(text.slice(start, end), exclude, count)
     const { directions } = await ask(user, BLOOM)
     return { directions: directions.slice(0, count) }
-  },
-
-  async custom({ text, start, end, label }) {
-    const user = `${marked(text, start, end)}
-
-Direction, in the writer's own words: "${label}". Read it as a feeling, idea or intention, not as words to insert.
-${grades}`
-    if (MOCK) return { direction: mockDirection(text.slice(start, end), label) }
-    const direction = await ask(user, GRADES)
-    return { direction: { label, ...direction } }
   },
 
   async blend({ text, start, end, pulls }) {
@@ -108,6 +99,22 @@ Write each move at three lengths: slight (a short phrase), medium (one sentence)
     const user = `${marked(text, start, end)}\n\nRewrite the marked passage in at most ${target} words. Keep the most important meaning and the writer's voice; drop or merge what matters least. Do not just cut words mid-sentence: it must read as finished text.`
     if (MOCK) return { text: mockShrink(text.slice(start, end), target) }
     return ask(user, BLEND)
+  },
+
+  /** The writer's own request: one rewrite (or new text) that does what they ask, plus fresh directions to steer that result further. */
+  async prompt({ mode, text, start, end, prompt, keep = [], count = 6 }) {
+    count = Math.max(2, Math.min(8, Number(count) || 6))
+    const task = mode === "write"
+      ? `New text will be inserted at the empty [[]]. The writer asks: "${prompt}". In "text", write what goes there so it does what they ask.`
+      : `The writer asks: "${prompt}". In "text", rewrite the marked passage so it does what they ask. It may change meaning, emphasis or length as far as the request needs.`
+    const user = `${marked(text, start, end)}
+
+${task}
+Then propose ${count} directions to steer that new version further, staying close to what the writer asked: nuances, intensities or angles of their request, not unrelated ideas. Each label is 1 to 3 lowercase words. You may keep up to ${Math.min(3, keep.length)} of these current directions if they still fit, using the exact same label: ${keep.join(", ") || "none"}.
+${grades} Every strength is a rewrite of the new version, not of the original.`
+    if (MOCK) return mockPrompt(mode, text.slice(start, end), prompt, keep, count)
+    const { text: result, directions } = await ask(user, PROMPTED)
+    return { text: result, directions: directions.slice(0, count) }
   },
 }
 
@@ -222,6 +229,18 @@ const MOCK_DIRECTIONS = {
     rules: [[/three years/i, "three years (2022–2025)"], [/\bdata tools\b/i, "data pipelines and dashboards"], [/\bsmall\b/i, "six-person"], [/\bdifferent fields\b/i, "biology, design and policy"], [/\buseful\b/i, "directly relevant"]],
     flourish: (t) => beforeEnd(t, ", across two cross-lab projects"),
   },
+  "more of it": {
+    rules: [[/\bcan\b/i, "really can"], [/\bimportant\b/i, "essential"], [/\bgood\b/i, "excellent"], [/\bwant\b/i, "really want"]],
+    flourish: (t) => beforeEnd(t, ", even more so than I can say here"),
+  },
+  subtler: {
+    rules: [[/\breally\b/i, ""], [/\bwill\b/i, "could"], [/\bI can\b/i, "I think I can"], [/\bcertain\b/i, "fairly sure"], [/\bessential\b/i, "useful"]],
+    flourish: (t) => beforeEnd(t, ", in a modest way"),
+  },
+  "more concrete": {
+    rules: [[/three years/i, "three years (2022–2025)"], [/\bdata tools\b/i, "data pipelines and dashboards"], [/\bteams?\b/i, "four teams"], [/\bstreets\b/i, "1,200 streets"]],
+    flourish: (t) => beforeEnd(t, ", with numbers to back it up"),
+  },
   playful: {
     rules: [[/\bdata tools\b/i, "little data machines"], [/\bteam\b/i, "crew"], [/\bpeople\b/i, "folks"], [/\bhopeful\b/i, "cheerfully hopeful"], [/\bdifferent fields\b/i, "all sorts of fields"]],
     flourish: (t) => beforeEnd(t, " (mostly with coffee)"),
@@ -320,4 +339,29 @@ function mockShrink(passage, target) {
   }
   if (count(text) > target) text = text.split(/\s+/).slice(0, target).join(" ").replace(/[,;:]?$/, ".")
   return text.trim()
+}
+
+const PROMPT_WRITES = {
+  thesis: "My master's thesis asked whether city sensor data could predict which streets flood first, and it taught me how to turn messy data into decisions people trust.",
+  pipeline: "The pipeline I built cut dataset preparation from two weeks to one afternoon, and four teams still use it today.",
+  studio: "What draws me to small teams is seeing a tool used the very week it ships.",
+  supervisor: "My supervisor once called me the person everyone asks when a dataset stops making sense, and that is the role I enjoy most.",
+}
+
+async function mockPrompt(mode, passage, prompt, keep, count) {
+  await new Promise((r) => setTimeout(r, 600))
+  const p = prompt.toLowerCase()
+  const topic = Object.keys(PROMPT_WRITES).find((k) => p.includes(k) || (k === "studio" && p.includes("nord")))
+  const refTitle = { thesis: "thesis abstract", pipeline: "pipeline notes", studio: "letter to Studio Nord", supervisor: "supervisor's feedback" }[topic]
+  const words = passage.split(/\s+/).filter(Boolean).length
+  let text
+  if (/short|concise|brief|cut/.test(p) && passage) text = mockShrink(passage, Math.max(4, Math.round(words * 0.55)))
+  else if (mode === "write") text = topic ? PROMPT_WRITES[topic] : `I also want to say this: ${prompt.replace(/^(please\s+)?(mention|add|say|write|talk about)\s+/i, "")}.`
+  else {
+    const known = Object.keys(MOCK_DIRECTIONS).find((l) => new RegExp(`\\b${l.split(" ").at(-1)}\\b`).test(p) && l.split(" ").at(-1).length > 3)
+    text = topic ? beforeEnd(passage, MOCK_REFS[refTitle]) : known ? mockDirection(passage, known).strong : beforeEnd(passage, ` — ${prompt}`)
+  }
+  const kept = keep.filter((l) => MOCK_DIRECTIONS[l]).slice(0, 2)
+  const fresh = ["more of it", "subtler", "more concrete", "warmer", "bolder", "quietly confident"].filter((l) => !kept.includes(l)).slice(0, count - kept.length)
+  return { text, directions: [...kept, ...fresh].map((label) => ({ ...mockDirection(text, label), kept: kept.includes(label) })) }
 }

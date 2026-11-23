@@ -61,9 +61,15 @@
   #hint b { color: var(--fg); font-weight: 500; }
   #meter { position: fixed; left: 50%; top: 22px; transform: translateX(-50%); font-size: 12px; z-index: 6; opacity: 0; transition: opacity .3s; pointer-events: none; }
   #meter.show { opacity: 1; }
-  #own { position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%); display: none; gap: 1ch; font-size: 14px; z-index: 6; }
-  #own.show { display: flex; }
-  #own input { width: 30ch; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid var(--mid); outline: none; }
+  #ask { position: fixed; left: 50%; bottom: 66px; transform: translateX(-50%); width: min(640px, 82vw); display: none; align-items: baseline; gap: 1ch; font-size: 14px; z-index: 6; cursor: text; }
+  body.open #ask { display: flex; }
+  #ask .mark { color: var(--fg); }
+  #askInput { flex: 1; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; caret-color: var(--fg); }
+  #askInput:focus { border-bottom-color: var(--fg); }
+  #askInput::placeholder { color: #666; }
+  #asked { display: none; font-size: 12px; color: var(--bg); background: var(--fg); padding: 0 6px; cursor: pointer; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+  #asked.show { display: inline-block; }
+  #ask.thinking #askInput { animation: think 0.9s ease-in-out infinite; }
   #toast { position: fixed; bottom: 48px; left: 24px; color: #ff8f73; font-size: 12px; z-index: 6; }
   #editor { display: none; margin: 18vh auto 0; width: min(46ch, 80vw); min-height: 60vh; font: inherit; color: var(--fg); background: none; border: 1px solid var(--low); padding: 14px; outline: none; resize: vertical; }
   body.editing #editor { display: block; }
@@ -78,7 +84,7 @@
 <aside id="refs"><h2>your documents · click a passage to reference it</h2><div id="docs"></div></aside>
 <div id="refsTab">references ›</div>
 <div id="meter"></div>
-<div id="own"><span>&gt; your own:</span><input id="ownInput" maxlength="60" /></div>
+<div id="ask"><span id="asked" title="click to remove"></span><span class="mark">&gt;</span><input id="askInput" maxlength="200" autocomplete="off" spellcheck="false" placeholder="type what you want, ↵ to apply" /></div>
 <div id="hint"></div>
 <div id="toast"></div>
 
@@ -117,7 +123,7 @@ const COMBO_WINDOW = 320;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("screen"), ctx = canvas.getContext("2d");
-const textEl = $("text"), hintEl = $("hint"), statusEl = $("status"), toastEl = $("toast"), ownEl = $("own"), ownInput = $("ownInput");
+const textEl = $("text"), hintEl = $("hint"), statusEl = $("status"), toastEl = $("toast"), askEl = $("ask"), askInput = $("askInput"), askedEl = $("asked");
 const refsEl = $("refs"), meterEl = $("meter");
 
 let W = 0, H = 0, RX = 0, RY = 0, CX = 0, CY = 0;
@@ -144,7 +150,7 @@ requestAnimationFrame(frame);
 
 function isOpen() { return !!seg && !seg.done && !!currentSet()?.length; }
 function currentSet() { return seg?.sets?.[seg.setIndex] ?? null; }
-function names() { return NAMES[seg?.mode ?? "edit"]; }
+function names() { return NAMES[seg?.mode === "write" && !seg?.prompt ? "write" : "edit"]; }
 
 function resize() {
   const dpr = devicePixelRatio || 1;
@@ -158,8 +164,8 @@ function resize() {
 function layoutRing() {
   const room = W - PANEL * easeOut(refsT);
   CX = room / 2; CY = H / 2;
-  RX = room / 2 - Math.max(110, room * 0.1);
-  RY = H / 2 - 64;
+  RX = Math.max(60, room / 2 - Math.max(110, room * 0.1));
+  RY = Math.max(60, H / 2 - 64);
 }
 
 function buildDocs() {
@@ -176,10 +182,19 @@ function render() {
   else {
     const what = seg.mode === "write" ? "a move, further out writes more" : "a meaning, nearer the edge is stronger";
     const pins = seg.pins.length ? ` (${seg.pins.length} pinned)` : "";
-    const arrows = seg.mode === "edit" ? " · <b>← ↓</b> shorter, tap fast for more · <b>→ ↑</b> back" : "";
-    hintEl.innerHTML = `<b>move</b> toward ${what} · <b>click</b> to pin${pins} · <b>↵</b> save${arrows}<br><b>scroll</b> ↓ new ${seg.mode === "write" ? "moves" : "meanings"} ↑ back (${seg.setIndex + 1}/${seg.sets.length}) · push the <b>right edge</b> for references · <b>/</b> your own · <b>esc</b> cancel`;
+    const arrows = seg.mode === "edit" ? " · <b>← ↓</b> shorter, tap fast for more · <b>→ ↑</b> back (when the ask bar is empty)" : "";
+    hintEl.innerHTML = `<b>move</b> toward ${what} · <b>click</b> to pin${pins} · <b>↵</b> save${arrows}<br><b>scroll</b> ↓ new ${seg.mode === "write" ? "moves" : "meanings"} ↑ back (${seg.setIndex + 1}/${seg.sets.length}) · push the <b>right edge</b> for references · <b>type</b> to ask for anything · <b>esc</b> cancel`;
   }
   renderPanel();
+  renderAsk();
+}
+
+function renderAsk() {
+  const prompt = seg?.prompt;
+  askedEl.classList.toggle("show", !!prompt);
+  askedEl.textContent = prompt ? `asked: ${prompt.query} ×` : "";
+  askEl.classList.toggle("thinking", !!seg?.asking);
+  askInput.placeholder = seg?.asking ? "thinking…" : prompt ? "ask again to refine, or steer with the ring" : seg?.mode === "write" ? "type what you want to add, ↵ to write it" : "type how you want this changed, ↵ to apply";
 }
 
 function renderText() {
@@ -283,14 +298,13 @@ function forget() {
 
 async function loadSet(target) {
   const seen = target.sets.flat().map((d) => d.label);
-  const custom = currentSet()?.filter((d) => d.kind === "custom") ?? [];
   target.loading = true;
   render();
   try {
     const route = target.mode === "write" ? "moves" : "bloom";
     const { directions } = await api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: seen });
     if (seg !== target) return;
-    target.sets.push([...directions.map((d) => ({ ...d, kind: "suggested" })), ...custom].slice(0, MAX_MEANINGS));
+    target.sets.push(directions.slice(0, MAX_MEANINGS).map((d) => ({ ...d, kind: "suggested", basis: basisOf(target) })));
     target.setIndex = target.sets.length - 1;
     labelT = 0;
     glow = [];
@@ -368,22 +382,72 @@ function placed(str, level) {
   return out;
 }
 
+/** What the ring's options start from: the writer's prompted version when there is one, otherwise the original. */
+function basisOf(target) { return target.prompt?.text ?? target.original; }
+
+function lengthOf(str) {
+  const sentences = (str.match(/[.!?](\s|$)/g) ?? []).length;
+  return sentences > 1 ? 3 : str.split(/\s+/).length > 8 ? 2 : 1;
+}
+
+/** The document as the model should see it: with the prompted version already in place, so steering refines it. */
+function contextOf(target) {
+  if (!target.prompt) return { mode: target.mode, text, start: target.start, end: target.end };
+  const inserted = target.mode === "write" ? placed(target.prompt.text, lengthOf(target.prompt.text)) : target.prompt.text;
+  return { mode: "edit", text: text.slice(0, target.start) + inserted + text.slice(target.end), start: target.start, end: target.start + inserted.length };
+}
+
 /** Every pull together: a single plain pull is instant, anything combined (or with references) asks the model. */
 async function combine(target, pulls) {
   const meanings = pulls.filter((p) => p.kind === "meaning");
   const refs = pulls.filter((p) => p.kind === "ref").map((p) => ({ title: p.doc.title, text: p.text }));
   const level = Math.max(1, ...meanings.map((p) => p.level));
-  if (!meanings.length && !refs.length) return target.original;
-  if (meanings.length === 1 && !meanings[0].partner && !refs.length) {
-    const t = meanings[0].dir[KEYS[meanings[0].level]];
-    return target.mode === "write" ? placed(t, level) : t;
-  }
+  const base = basisOf(target);
+  const done = (t) => (target.mode === "write" ? placed(t, target.prompt ? lengthOf(t) : level) : t);
+  if (!meanings.length && !refs.length) return target.prompt ? done(base) : target.original;
+  if (meanings.length === 1 && !meanings[0].partner && !refs.length && meanings[0].dir.basis === base) return done(meanings[0].dir[KEYS[meanings[0].level]]);
+  const context = contextOf(target);
   const weights = new Map();
   for (const p of meanings) for (const d of [p.dir, p.partner].filter(Boolean)) weights.set(d.label, Math.max(weights.get(d.label) ?? 0, p.level / 3));
-  const payload = { mode: target.mode, text, start: target.start, end: target.end, refs,
-    pulls: [...weights].map(([label, weight]) => ({ label, weight, length: target.mode === "write" ? NAMES.write[Math.round(weight * 3)] : undefined })) };
-  const { text: out } = await api("compose", payload);
-  return target.mode === "write" ? placed(out, level) : out;
+  const pullsOut = [...weights].map(([label, weight]) => ({ label, weight, length: context.mode === "write" ? NAMES.write[Math.round(weight * 3)] : undefined }));
+  const { text: out } = await api("compose", { ...context, refs, pulls: pullsOut });
+  return done(out);
+}
+
+/** The writer's own words: rewrites (or writes) what they ask, then swaps in ring options that steer from that result. */
+async function askFor(query) {
+  const target = seg;
+  if (!target || target.asking) return;
+  if (!query) return clearPrompt();
+  target.asking = true; target.waiting = true;
+  render();
+  try {
+    const keep = (currentSet() ?? []).map((d) => d.label);
+    const { text: result, directions } = await api("prompt", { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, count: MEANINGS });
+    if (seg !== target) return;
+    if (target.promptFrom == null) target.promptFrom = target.setIndex;
+    target.prompt = { query: target.prompt ? `${target.prompt.query} → ${query}` : query, text: result };
+    target.pins = target.pins.filter((p) => p.kind === "ref");
+    target.sets.push(directions.map((d) => ({ ...d, kind: d.kept ? "kept" : "suggested", basis: result })));
+    target.setIndex = target.sets.length - 1;
+    labelT = 0; glow = []; aim = null;
+    sound.swap();
+  } catch (error) { toast(error.message); }
+  target.asking = false; target.waiting = false;
+  render();
+  updateAim();
+  refreshPreview();
+}
+
+function clearPrompt() {
+  const target = seg;
+  if (!target?.prompt) return;
+  target.prompt = null;
+  target.pins = target.pins.filter((p) => p.kind === "ref");
+  target.setIndex = target.promptFrom ?? 0;
+  target.promptFrom = null;
+  sound.unpin();
+  swapped();
 }
 
 let previewToken = 0, previewTimer = null;
@@ -395,7 +459,7 @@ function refreshPreview() {
   const run = async () => {
     try {
       const t = await combine(target, pulls);
-      if (token === previewToken && seg === target) { target.preview = pulls.length ? t : null; target.waiting = false; renderText(); }
+      if (token === previewToken && seg === target) { target.preview = pulls.length || target.prompt ? t : null; target.waiting = !!target.asking; renderText(); }
     } catch (error) { toast(error.message); }
   };
   if (instant) run();
@@ -439,7 +503,7 @@ function swapped() {
 }
 
 addEventListener("mousedown", (e) => {
-  if (!isOpen() || e.target.closest("#own, #top")) return;
+  if (!isOpen() || e.target.closest("#ask, #top")) return;
   const para = e.target.closest("#refs p");
   if (e.target.closest("#refs") && !para) return;
   e.preventDefault();
@@ -474,11 +538,11 @@ addEventListener("mousedown", (e) => {
 async function save() {
   const target = seg;
   const pulls = target.pins.length ? target.pins : aim?.level ? [pullOf(aim)] : [];
-  if (!pulls.length) return toast(target.mode === "write" ? "pin a move first, or point at one" : "pin a meaning first, or point at one");
+  if (!pulls.length && !target.prompt) return toast(target.mode === "write" ? "pin a move, point at one, or type what you want" : "pin a meaning, point at one, or type what you want");
   collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: target.pins.map((p) => ({ x: p.x, y: p.y })) };
   sound.save(pulls.length);
   target.preview = null;
-  const instant = pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner;
+  const instant = !pulls.length || (pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner && pulls[0].dir.basis === basisOf(target));
   if (!instant) { target.waiting = true; finish(target, false); }
   try { target.current = await combine(target, pulls); }
   catch (error) { toast(error.message); }
@@ -489,7 +553,7 @@ async function save() {
 function finish(target, fade) {
   target.done = true;
   aim = null;
-  ownEl.classList.remove("show");
+  askInput.blur(); askInput.value = "";
   refsEl.classList.remove("show");
   if (fade) {
     changes++;
@@ -502,7 +566,7 @@ function cancel() {
   collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: [] };
   seg = null;
   aim = null;
-  ownEl.classList.remove("show");
+  askInput.blur(); askInput.value = "";
   refsEl.classList.remove("show");
   render();
 }
@@ -542,6 +606,8 @@ async function runShrink() {
 
 /** The words that go turn into white boxes, then break apart; the new wording flashes in. */
 async function shatter(target, before, after) {
+  target.prompt = null;
+  target.promptFrom = null;
   target.pins = [];
   target.preview = null;
   target.doomedFrom = after;
@@ -624,35 +690,45 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 /* ---------- keys ---------- */
 
+/** Arrows shorten (← ↓) or bring back (→ ↑) the passage, but only while nothing is typed in the ask bar; otherwise they move through what you typed. */
+const ARROWS = { ArrowLeft: -1, ArrowDown: -1, ArrowRight: 1, ArrowUp: 1 };
+
+function moveInAsk(key) {
+  askInput.focus();
+  const at = askInput.selectionStart ?? askInput.value.length;
+  const to = key === "ArrowLeft" ? at - 1 : key === "ArrowRight" ? at + 1 : key === "ArrowUp" ? 0 : askInput.value.length;
+  const clamped = Math.max(0, Math.min(askInput.value.length, to));
+  askInput.setSelectionRange(clamped, clamped);
+}
+
 addEventListener("keydown", (e) => {
-  if (document.body.classList.contains("editing") || e.target === ownInput) return;
+  if (document.body.classList.contains("editing") || e.target === askInput) return;
   if (!isOpen()) return;
   if (e.key === "Escape") return cancel();
   if (e.key === "Enter") { e.preventDefault(); return save(); }
-  if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); return shrinkKey(-1); }
-  if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); return shrinkKey(1); }
-  if (e.key === "/") { e.preventDefault(); ownEl.classList.add("show"); ownInput.value = ""; ownInput.focus(); }
+  if (ARROWS[e.key]) {
+    e.preventDefault();
+    if (askInput.value) return moveInAsk(e.key);
+    return shrinkKey(ARROWS[e.key]);
+  }
+  if (e.key === "/" || (e.key.length === 1 && /\p{L}|\p{N}/u.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey)) {
+    e.preventDefault();
+    if (e.key !== "/") askInput.value += e.key;
+    askInput.focus();
+  }
 });
 
-ownInput.addEventListener("keydown", async (e) => {
-  if (e.key === "Escape") { ownEl.classList.remove("show"); return; }
-  if (e.key !== "Enter" || !ownInput.value.trim()) return;
-  const label = ownInput.value.trim(), set = currentSet(), target = seg;
-  ownEl.classList.remove("show");
-  if (!set) return;
-  try {
-    let direction;
-    if (target.mode === "write") {
-      const lengths = await Promise.all([1, 2, 3].map((l) => api("compose", { mode: "write", text, start: target.start, end: target.end, refs: [], pulls: [{ label, weight: l / 3, length: NAMES.write[l] }] })));
-      direction = { label, slight: lengths[0].text, medium: lengths[1].text, strong: lengths[2].text };
-    } else direction = (await api("custom", { text, start: target.start, end: target.end, label })).direction;
-    if (set.length >= MAX_MEANINGS) set.splice(set.findLastIndex((d) => d.kind !== "custom"), 1);
-    set.push({ ...direction, kind: "custom" });
-    labelT = 0; glow = [];
-    sound.meaning(set.length - 1);
-  } catch (error) { toast(error.message); }
-  render();
+askInput.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { askInput.value = ""; askInput.blur(); return; }
+  if (ARROWS[e.key] && !askInput.value) { e.preventDefault(); return shrinkKey(ARROWS[e.key]); }
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const query = askInput.value.trim();
+  askInput.value = "";
+  askInput.blur();
+  askFor(query);
 });
+askedEl.addEventListener("mousedown", (e) => { e.preventDefault(); clearPrompt(); });
 
 $("edit").addEventListener("click", () => {
   const editor = $("editor");
@@ -676,6 +752,11 @@ function renderPanel() {
 /* ---------- drawing ---------- */
 
 function frame(t) {
+  requestAnimationFrame(frame);
+  try { draw(t); } catch (error) { console.error(error); }
+}
+
+function draw(t) {
   const time = t / 1000;
   const open = isOpen();
   openT += ((open ? 1 : 0) - openT) * (open ? 0.07 : 0.2);
@@ -690,7 +771,7 @@ function frame(t) {
   drawPlanted();
   drawParticles();
   if (open && !overPanel(mouse.x)) drawCursor();
-  requestAnimationFrame(frame);
+  
 }
 
 function ellipsePoint(q, deg) {
@@ -758,7 +839,7 @@ function drawRing(set, t, time) {
 
     const mid = (from + to) / 2;
     const reached = Math.max(0, Math.min(1, (sweep - from) / Math.max(1, to - from)));
-    const label = `${d.kind === "custom" ? "*" : ""}${d.label}`;
+    const label = d.label;
     const typed = label.slice(0, Math.ceil(label.length * Math.min(reached, labelT * 1.4)));
     const [lx, ly] = ellipsePoint(OUTER + 0.045, mid);
     ctx.font = `${g > 0.5 ? 500 : 400} 12px 'IBM Plex Mono', monospace`;
