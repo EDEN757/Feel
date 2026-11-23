@@ -12,7 +12,11 @@ const STOPPED = Symbol("stopped")
 /** Every pause and movement is stretched by this much, so there is time to read what changed. */
 const PACE = 1.14
 
-/** One interaction each. `it` is the set of gestures built in `startAutopilot`. */
+/**
+ * One interaction each. `it` is the set of gestures built in `startAutopilot`.
+ * Only the first clip shows the selection being dragged; the others open with the ring already up,
+ * so each one starts on the thing it is about.
+ */
 const CLIPS = {
   async change(it) {
     await it.select(FIRST)
@@ -26,7 +30,7 @@ const CLIPS = {
   },
 
   async combine(it) {
-    await it.select(FIRST)
+    await it.open(FIRST)
     await it.toRing(0, 2, 800, 0.35)
     await it.wait(300)
     it.click()
@@ -48,7 +52,7 @@ const CLIPS = {
   },
 
   async ask(it) {
-    await it.select(SECOND)
+    await it.open(SECOND)
     await it.type("connect it to my thesis")
     await it.settled()
     await it.wait(1500)
@@ -59,7 +63,7 @@ const CLIPS = {
   },
 
   async shorter(it) {
-    await it.select(LONG)
+    await it.open(LONG)
     await it.wait(500)
     for (let i = 0; i < 3; i++) { it.press("ArrowLeft"); await it.wait(1500) }
     it.press("ArrowRight")
@@ -69,7 +73,7 @@ const CLIPS = {
   },
 
   async documents(it) {
-    await it.select(FIRST)
+    await it.open(FIRST)
     await it.moveTo(innerWidth - 4, innerHeight / 2, 900)
     await it.wait(700)
     const passage = document.querySelectorAll("#refs .doc p")[3].getBoundingClientRect()
@@ -174,17 +178,25 @@ export function startAutopilot(app, name) {
       await wait(400)
     }
 
+    /** Starts with the phrase already selected and the ring open, skipping the drag. */
+    async function open(phrase) {
+      const start = app.text().indexOf(phrase)
+      app.select(start, start + phrase.length)
+      await settled()
+      await wait(500)
+    }
+
     /** Types into the ask bar letter by letter, then sends it. */
     async function type(words) {
       const ask = document.querySelector("#askInput")
-      for (const letter of words) { ask.value += letter; await wait(55) }
-      await wait(450)
+      for (const letter of words) { ask.value += letter; await wait(60) }
+      await wait(800)
       press("Enter", ask)
       ask.value = ""
       await wait(500)
     }
 
-    return { app, wait, press, settled, moveTo, select, type, click: () => send("mousedown"), toRing: (index, level, ms, across) => moveTo(...app.point(index, level, across), ms) }
+    return { app, wait, press, settled, moveTo, select, open, type, click: () => send("mousedown"), toRing: (index, level, ms, across) => moveTo(...app.point(index, level, across), ms) }
   }
 
   /** Paints a selection over the given boxes. Drawn by hand, because a frame without focus shows no real selection. */

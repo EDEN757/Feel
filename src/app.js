@@ -893,6 +893,7 @@ function closeDocForm() { docForm.reset(); docForm.hidden = true; $("docAdd").hi
 
 function frame(t) {
   requestAnimationFrame(frame);
+  document.body.classList.toggle("typing", isOpen() && !!askInput.value);
   try { draw(t); } catch (error) { console.error(error); }
 }
 

@@ -54,6 +54,9 @@ body.open #refsTab { display: block; }
 #ask { position: fixed; left: 50%; bottom: 66px; transform: translateX(-50%); width: min(640px, 82vw); display: none; align-items: baseline; gap: 1ch; font-size: 14px; z-index: 6; cursor: text; }
 body.open #ask { display: flex; }
 #ask .mark { color: var(--fg); }
+#ask, #screen, #text, #hint { transition: bottom .35s cubic-bezier(.2, .8, .2, 1), transform .35s cubic-bezier(.2, .8, .2, 1), width .35s cubic-bezier(.2, .8, .2, 1), font-size .35s cubic-bezier(.2, .8, .2, 1), opacity .35s; }
+body.typing #ask { bottom: 50%; transform: translate(-50%, 50%); width: min(920px, 86vw); font-size: 26px; }
+body.typing #screen, body.typing #text, body.typing #hint, body.typing #refs { opacity: .14; }
 #askInput { flex: 1; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; caret-color: var(--fg); }
 #askInput:focus { border-bottom-color: var(--fg); }
 #askInput::placeholder { color: #666; }
