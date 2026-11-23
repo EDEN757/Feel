@@ -3,6 +3,7 @@
  * as the page scrolls, the clips, and the tour's checklist.
  */
 
+/** How far from the cursor dots are pushed, at most; small words use less. */
 const REACH = 34
 const CLIP_WIDTH = 840, CLIP_HEIGHT = 500
 
@@ -90,7 +91,7 @@ function drawWord(canvas) {
   const word = canvas.dataset.word, cell = Number(canvas.dataset.cell), falls = "fall" in canvas.dataset
   const ctx = canvas.getContext("2d")
   const dpr = devicePixelRatio || 1
-  const margin = cell * 2
+  const margin = cell * 2, reach = Math.min(REACH, cell * 9)
   const wordWidth = margin * 2 + (word.length * 6 - 1) * cell, wordHeight = margin * 2 + 7 * cell
   const side = falls ? 60 : 0, room = falls ? Math.min(innerHeight * 0.62, 560) : 0
   const width = wordWidth + side * 2, height = wordHeight + room
@@ -114,7 +115,7 @@ function drawWord(canvas) {
   let mouse = null
   addEventListener("mousemove", (e) => {
     const box = canvas.getBoundingClientRect()
-    const inside = e.clientX > box.left - REACH && e.clientX < box.right + REACH && e.clientY > box.top - REACH && e.clientY < box.top + wordHeight + REACH
+    const inside = e.clientX > box.left - reach && e.clientX < box.right + reach && e.clientY > box.top - reach && e.clientY < box.top + wordHeight + reach
     mouse = inside ? { x: e.clientX - box.left, y: e.clientY - box.top } : null
   })
 
@@ -127,8 +128,8 @@ function drawWord(canvas) {
     for (const dot of dots) {
       if (mouse) {
         const dx = dot.x - mouse.x, dy = dot.y - mouse.y, distance = Math.hypot(dx, dy) || 1
-        if (distance < REACH) {
-          const push = (1 - distance / REACH) * 1.8
+        if (distance < reach) {
+          const push = (1 - distance / reach) * 1.8
           dot.vx += (dx / distance) * push - (dy / distance) * push * 0.5
           dot.vy += (dy / distance) * push + (dx / distance) * push * 0.5
         }
