@@ -25,7 +25,7 @@ let collapse = null;
 let waitingSince = 0, waitT = 0;
 /** A wait shorter than this shows nothing: most answers are already there. */
 const PATIENCE_MS = 350;
-/** What the app is showing this frame: { open, set, aim, pins, mouse, names, panel, overPanel, onPin, busy }. */
+/** What the app is showing this frame: { open, set, aim, pins, mouse, names, panel, cursor, onPin, busy }. */
 let view = null;
 
 resize();
@@ -124,7 +124,7 @@ export function draw(t, showing) {
   if (open) drawPins(time);
   drawPlanted();
   drawParticles();
-  if (open && !view.overPanel) drawCursor();
+  if (view.cursor) drawCursor();
   drawWaiting(time);
 }
 
@@ -272,7 +272,7 @@ function drawCursor() {
     ctx.beginPath(); ctx.moveTo(ix, iy); ctx.lineTo(view.mouse.x, view.mouse.y); ctx.stroke();
     ctx.setLineDash([]);
   }
-  const size = 4 + level * 2;
+  const size = 5 + level * 2;
   ctx.fillStyle = "#fff";
   ctx.fillRect(view.mouse.x - size / 2, view.mouse.y - size / 2, size, size);
 }

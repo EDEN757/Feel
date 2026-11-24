@@ -407,6 +407,8 @@ function nearPin(x, y) {
   return seg?.pins.find((p) => (p.kind !== "ref" || panelOut() < 0.5) && Math.hypot(p.x - x, p.y - y) < 14) ?? null;
 }
 
+document.addEventListener("mouseleave", () => { mouse = { x: -1, y: -1 }; });
+
 addEventListener("mousemove", (e) => {
   mouse = { x: e.clientX, y: e.clientY };
   trace(mouse.x, mouse.y);
@@ -654,6 +656,9 @@ function frame(t) {
     askInput.style.height = "";
     if (typing) askInput.style.height = `${askInput.scrollHeight}px`;
   }
-  const view = { open: isOpen(), set: currentSet(), aim, mouse, pins: seg?.pins ?? [], names: names(), panel: refsEl.classList.contains("show"), overPanel: overPanel(mouse.x), onPin: !!nearPin(mouse.x, mouse.y), busy: !!seg && !!(seg.waiting || seg.asking || seg.loading) };
+  // The drawn cursor replaces the system one everywhere the canvas is on top: not in the editor, a dialog or the documents panel.
+  const cursor = mouse.x >= 0 && !document.body.classList.contains("editing") && !$("keyDialog").open && !overPanel(mouse.x);
+  document.documentElement.classList.toggle("own-cursor", cursor);
+  const view = { cursor, open: isOpen(), set: currentSet(), aim, mouse, pins: seg?.pins ?? [], names: names(), panel: refsEl.classList.contains("show"), onPin: !!nearPin(mouse.x, mouse.y), busy: !!seg && !!(seg.waiting || seg.asking || seg.loading) };
   try { draw(t, view); } catch (error) { console.error(error); }
 }
