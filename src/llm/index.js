@@ -8,7 +8,7 @@
  * time are the first to go: they are dropped, and none are started until the pause is over.
  */
 
-import { complete, DEFAULT_MODEL } from "./cerebras.js"
+import { complete, DEFAULT_MODEL, MODELS } from "./cerebras.js"
 import { PROMPTS, SYSTEM } from "./prompts.js"
 import { simulate } from "./simulator.js"
 
@@ -22,6 +22,8 @@ const remembered = new Map()
 const waiting = []
 let running = 0
 let pausedUntil = 0, strikes = 0, timer = null
+
+export { MODELS }
 
 /** The key and model live only in this browser's localStorage. */
 export const settings = {

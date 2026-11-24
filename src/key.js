@@ -1,7 +1,7 @@
 /** The connection to a real model: the key dialog, the label in the top bar, and the first-time choice. */
 
 import { $, toast } from "./dom.js";
-import { isLive, settings } from "./llm/index.js";
+import { MODELS, isLive, settings } from "./llm/index.js";
 
 const CHOSEN_STORAGE = "feeling-mode-chosen";
 const dialog = $("keyDialog");
@@ -23,6 +23,9 @@ function open(asChoice) {
   $("keySave").textContent = asChoice ? "use this key" : "save";
   $("keyRemove").hidden = asChoice;
   $("keyInput").value = settings.apiKey;
+  // A model saved by hand earlier stays selectable, even if it is not one of the listed ones.
+  const ids = [...new Set([...MODELS.map((model) => model.id), settings.model])];
+  $("modelInput").replaceChildren(...ids.map((id) => new Option(id, id)));
   $("modelInput").value = settings.model;
   dialog.returnValue = "";
   dialog.showModal();

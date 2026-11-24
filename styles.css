@@ -74,7 +74,8 @@ dialog h2 { font: 500 13px var(--mono); margin: 0 0 12px; }
 dialog p { margin: 0 0 10px; color: var(--mid); }
 dialog label { display: grid; grid-template-columns: 8ch 1fr; align-items: baseline; margin-top: 12px; color: var(--mid); }
 dialog input { font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; }
-dialog input:focus { border-bottom-color: var(--fg); }
+dialog input:focus, dialog select:focus { border-bottom-color: var(--fg); }
+dialog select { font: inherit; color: var(--fg); background: #050505; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; cursor: pointer; }
 dialog menu { display: flex; justify-content: flex-end; gap: 22px; margin: 24px 0 0; padding: 0; }
 dialog menu button { color: var(--mid); }
 dialog menu button:hover, dialog menu button[value="save"] { color: var(--fg); }

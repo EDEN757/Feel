@@ -56,3 +56,17 @@ test("asking for real takes over a request made ahead", async () => {
   assert.deepEqual(await real, { text: "ok" })
   assert.equal(calls, 2)
 })
+
+test("each model is sent the least reasoning it offers", async () => {
+  await pauseOver()
+  const sent = []
+  const reply = globalThis.fetch
+  globalThis.fetch = async (url, options) => { sent.push(JSON.parse(options.body)); return reply() }
+  for (const [model, effort] of [["gpt-oss-120b", "low"], ["qwen-3.8-27b", "none"], ["some-other-model", undefined]]) {
+    settings.save({ apiKey: "test-key", model })
+    await request("compose", payload(6))
+    assert.equal(sent.at(-1).model, model)
+    assert.equal(sent.at(-1).reasoning_effort, effort)
+  }
+  globalThis.fetch = reply
+})

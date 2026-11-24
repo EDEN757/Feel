@@ -34,7 +34,7 @@ To stop it, press Ctrl+C in the terminal. For another port, run `PORT=5000 npm s
 Out of the box it runs on a **simulator** with canned rewrites, which is enough to try the interaction on the sample letter. For your own text you need a model:
 
 1. Create an API key at [Cerebras](https://cloud.cerebras.ai).
-2. In the app, click **simulator · add key** in the top bar and paste it.
+2. In the app, click **simulator · add key** in the top bar and paste it. Pick the model in the same dialog: `gpt-oss-120b` (the default) or `qwen-3.8-27b`.
 
 The key is stored only in your browser (localStorage) and sent only to `api.cerebras.ai`, straight from your browser. It never passes through a server of this project, because there is none. **remove key** in the same dialog deletes it. What the model is asked, word for word, is in [src/llm/prompts.js](src/llm/prompts.js).
 
