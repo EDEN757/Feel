@@ -4,9 +4,9 @@ See the change before you ask for it.
 
 ## Idea
 
-Language models are getting faster. This is a UX research project on what working with one should feel like once the answer arrives as fast as your hand moves.
+A UX research project on a new way for people and LLMs to work together, one that takes advantage of how fast models have become at answering.
 
-Today you describe what you want, read the answer, and describe it again. Here you see the versions of your text and choose a direction.
+You don't describe what you want. You see the versions of your text and choose a direction.
 
 1. **Change the feeling**: select words and move across the ring. The passage changes as you move, and stronger toward the edge. Click to combine meanings.
 
@@ -16,7 +16,7 @@ Today you describe what you want, read the answer, and describe it again. Here y
 
    ![ask in your own words](media/ask.gif)
 
-3. **Make it shorter**: models use too many words. Cut with ← and bring words back with →.
+3. **Make it shorter**: cut words and keep the meaning. ← cuts, → brings words back.
 
    ![make it shorter](media/shorter.gif)
 
@@ -79,4 +79,4 @@ tests/                   run with `npm test`
 
 Made by [Edoardo Schiatti](https://github.com/EDEN757).
 
-Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun.
+Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun, and by my need to write better cover letters.
