@@ -1,6 +1,6 @@
 {
   "name": "feel",
-  "description": "Steer your writing by meaning: select words, move toward what you mean.",
+  "description": "Feel the change in real time. A research project on new interactions between humans and LLMs.",
   "private": true,
   "type": "module",
   "scripts": {

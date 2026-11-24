@@ -9,6 +9,8 @@ import { $ } from "./dom.js";
 
 /** The ring's bands run from INNER to OUTER, as fractions of its radius. */
 export const INNER = 0.42, OUTER = 0.96;
+/** Labels keep at least this far from the sides of the window. */
+const EDGE = 8;
 /** Width of the documents panel, which the ring's pins and the cursor have to know about. */
 export const PANEL = 330;
 /** Within this many degrees of an arc's edge, the cursor blends it with its neighbour. */
@@ -213,9 +215,13 @@ function drawRing(set, t, time) {
     const reached = Math.max(0, Math.min(1, (sweep - from) / Math.max(1, to - from)));
     const label = d.label;
     const typed = label.slice(0, Math.ceil(label.length * Math.min(reached, labelT * 1.4)));
-    const [lx, ly] = ellipsePoint(OUTER + 0.045, mid);
+    let [lx, ly] = ellipsePoint(OUTER + 0.045, mid);
     ctx.font = `${g > 0.5 ? 500 : 400} 12px 'IBM Plex Mono', monospace`;
     ctx.textAlign = Math.abs(lx - CX) < 30 ? "center" : lx < CX ? "right" : "left";
+    /* A long label at the side of a narrow window would run off the screen: it starts at the edge instead. */
+    const wide = ctx.measureText(label).width;
+    if (ctx.textAlign === "right" && lx - wide < EDGE) { ctx.textAlign = "left"; lx = EDGE; }
+    if (ctx.textAlign === "left" && lx + wide > W - EDGE) { ctx.textAlign = "right"; lx = W - EDGE; }
     ctx.fillStyle = `rgba(255,255,255,${0.45 + 0.55 * g})`;
     ctx.fillText(typed + (typed.length < label.length && typed.length ? "█" : ""), lx, ly + 4);
     /* The strength goes on the label's far side from the ring: above it for arcs in the top half, below it otherwise. */
