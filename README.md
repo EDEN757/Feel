@@ -87,4 +87,4 @@ tests/                   run with `npm test`
 
 Made by [Edoardo Schiatti](https://github.com/EDEN757).
 
-Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun, which is well worth a look, and by my need to write better cover letters.
+Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun (amazing work), and by my need to write better cover letters.
