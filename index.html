@@ -64,15 +64,9 @@
     <p class="note">click a clip to move on</p>
   </div>
 
-  <menu id="begin">
-    <button id="startOwn">paste your own text <span aria-hidden="true">→</span></button>
-    <button id="startSample">try a sample letter</button>
-  </menu>
-
-  <p id="small">feel is made for a mouse, a keyboard and a wide window.<br>Open it on a computer to try it.</p>
-
   <div id="tour">
-    <h2>try it yourself</h2>
+    <h2>try the demo</h2>
+    <p class="sub">A sample letter with pre-written answers. No key needed.</p>
     <ol id="steps">
       <li data-step="select"><b>select</b> words, then move</li>
       <li data-step="pin"><b>click</b> the ring to pin</li>
@@ -82,7 +76,16 @@
       <li data-step="write"><b>click</b> between words to write</li>
     </ol>
     <iframe id="demo" data-frame="?demo" title="feel, running on sample text"></iframe>
-    <p class="note">This demo runs on a sample letter with pre-written answers. Paste your own text and add a Cerebras key to use a real model.</p>
+  </div>
+
+  <div id="real">
+    <h2>use it for real</h2>
+    <p class="sub">Your own text, answered by a real model. You bring a Cerebras API key; it stays in your browser.</p>
+    <menu id="begin">
+      <button id="startOwn">paste your own text <span aria-hidden="true">→</span></button>
+      <button id="startSample">start from a sample letter</button>
+    </menu>
+    <p id="small">feel is made for a mouse, a keyboard and a wide window.<br>Open it on a computer to try it.</p>
   </div>
 
   <footer id="foot">

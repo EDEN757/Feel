@@ -110,7 +110,10 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #hero { position: relative; min-height: 66vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
 #hero h1 { font: 500 16px var(--mono); margin: 0; }
 #hero p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
-#begin { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; margin: 0 0 16vh; padding: 0 24px; }
+#real { display: grid; justify-items: center; gap: 14px; padding: 15vh 24px 17vh; text-align: center; }
+#real h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0; }
+#start .sub { margin: 0; font-size: 13px; color: var(--mid); max-width: 56ch; text-align: center; }
+#begin { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; margin: 14px 0 0; padding: 0; }
 #begin button { font-size: 16px; padding: 13px 28px; border: 1px solid var(--fg); transition: background .15s, color .15s; }
 #begin #startOwn, #begin button:hover { background: var(--fg); color: var(--bg); }
 #begin #startOwn:hover { background: var(--bg); color: var(--fg); }
@@ -134,7 +137,6 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #steps li.done::before { content: "■ "; color: var(--fg); }
 #steps li.done b { color: var(--mid); }
 #demo { width: min(1180px, 100%); height: min(760px, 86vh); border: 1px solid #2a2a2a; background: var(--bg); }
-#tour .note { margin: 0; font-size: 13px; color: #666; text-align: center; }
 
 body.demo #top, body.demo #refsTab { display: none; }
 html:has(body.clip) { overflow: hidden; }
@@ -151,7 +153,7 @@ body.demo #text { padding: 11vh 0 0; }
 body.demo { font-size: 15px; }
 #repoLink { display: block; line-height: 0; }
 
-#clips { padding: 0 max(24px, 5vw) 7vh; display: grid; justify-items: center; gap: 22px; }
+#clips { padding: 0 max(24px, 5vw) 15vh; display: grid; justify-items: center; gap: 22px; }
 #clips h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0 0 6px; }
 #clips { padding-left: 0; padding-right: 0; grid-template-columns: minmax(0, 1fr); }
 #clips .rail { width: 100%; overflow: hidden; }
@@ -175,7 +177,6 @@ body.clip:not([data-clip="ask"]) #ask { display: none !important; }
 
 #clips figcaption { margin-top: 14px; font-size: 15px; }
 #tour { padding-left: 0; padding-right: 0; padding-bottom: 0; }
-#tour .note { padding: 16px 24px 44px; color: var(--mid); }
 #demo { width: 100%; height: 100vh; border: 0; border-top: 1px solid #2a2a2a; border-bottom: 1px solid #2a2a2a; }
 body.demo:not(.clip) { font-size: 16px; }
 body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
@@ -186,9 +187,9 @@ body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
 #foot a:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 4px; }
 
 /* Phones and narrow windows see the front page and its clips, but nothing that needs a mouse and keyboard. */
-#small { display: none; margin: 0; padding: 0 24px 16vh; text-align: center; font-size: 14px; color: var(--mid); }
+#small { display: none; margin: 0; font-size: 14px; color: var(--mid); }
 @media (max-width: 760px), (hover: none) and (pointer: coarse) {
-  body.home #begin, body.home #tour { display: none; }
+  body.home #real > :not(#small), body.home #tour { display: none; }
   body.home #top button:not(#home) { display: none; }
   body.home #small { display: block; }
 }
