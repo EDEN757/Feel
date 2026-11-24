@@ -21,7 +21,11 @@ let RX = 0, RY = 0, CX = 0, CY = 0;
 let openT = 0, labelT = 0, refsT = 0;
 let glow = [], flashes = [], planted = [], particles = [], trail = [];
 let collapse = null;
-/** What the app is showing this frame: { open, set, aim, pins, mouse, names, panel, overPanel, onPin }. */
+/** When the current wait began, and how visible its waves are (0 to 1). */
+let waitingSince = 0, waitT = 0;
+/** A wait shorter than this shows nothing: most answers are already there. */
+const PATIENCE_MS = 350;
+/** What the app is showing this frame: { open, set, aim, pins, mouse, names, panel, overPanel, onPin, busy }. */
 let view = null;
 
 resize();
@@ -121,6 +125,23 @@ export function draw(t, showing) {
   drawPlanted();
   drawParticles();
   if (open && !view.overPanel) drawCursor();
+  drawWaiting(time);
+}
+
+/** Waves spread from the cursor, like a radar, while an answer is taking long enough to notice. */
+function drawWaiting(time) {
+  const now = performance.now();
+  if (!view.busy) waitingSince = 0;
+  else if (!waitingSince) waitingSince = now;
+  const shown = view.busy && now - waitingSince > PATIENCE_MS ? 1 : 0;
+  waitT += (shown - waitT) * 0.1;
+  if (waitT < 0.02 || view.mouse.x < 0) return;
+  ctx.lineWidth = 1;
+  for (let k = 0; k < 3; k++) {
+    const phase = (time * 0.8 + k / 3) % 1;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - phase) * waitT})`;
+    ctx.beginPath(); ctx.arc(view.mouse.x, view.mouse.y, 9 + easeOut(phase) * 38, 0, Math.PI * 2); ctx.stroke();
+  }
 }
 
 export function ellipsePoint(q, deg) {

@@ -16,7 +16,7 @@ Rules for everything you write:
 - Unless asked otherwise, keep roughly the same length as the marked passage.
 - Same language as the text. Plain text, no quotes, no commentary.`
 
-const STRENGTHS = `Write each direction at three strengths: slight (one or two words change), medium (a clear shift), strong (fully committed, still the same facts). Even slight must visibly differ from the passage: never return it unchanged, and never repeat the same wording at two strengths.`
+const STRENGTHS = `Write each direction at three strengths: slight (one or two words change), medium (a clear shift), strong (fully committed, still the same facts). Even slight must visibly differ from the passage: never return it unchanged, and never repeat the same wording at two strengths. Every version is the whole passage rewritten: it keeps all of the passage's facts and details and roughly its length. Never summarise it or drop a sentence.`
 const LENGTHS = `Write each at three lengths: slight (a short phrase), medium (one sentence), strong (a short paragraph). Each must read naturally right where the mark is.`
 
 /** Texts up to WHOLE characters are sent in full. Longer ones keep their OPENING, then BEFORE and AFTER the spot. */
@@ -62,8 +62,7 @@ ${LENGTHS}`,
       schema: TEXT,
       user: `${marked(text, start, end)}
 
-${mixTask(mode)}
-${mixOf(pulls)}${sourcesOf(refs)}
+${mixTask(mode, pulls, refs)}${sourcesOf(refs)}
 Return the single result.`,
     }
   },
@@ -79,10 +78,9 @@ Return the single result.`,
       schema: object({ text: string, options: list(graded) }),
       user: `${marked(text, start, end)}
 
-${mixTask(mode)}
-${mixOf(pins)}${sourcesOf(refs)}
+${mixTask(mode, pins, refs)}${sourcesOf(refs)}
 Put that result in "text".
-${options.length ? `Then, for each of these further options, write the same result with that option added on top, at ${steps}. Use exactly these labels, in this order: ${options.join(", ")}.` : `Return "options" as an empty list.`}`,
+${options.length ? `Then, for each of these further options, write that same result with the option added on top, at ${steps}. Every version starts from the result in "text", not from the marked passage: it keeps everything the result says${refs.length ? ", including what it took from the references," : ""} and roughly its length, and only shifts it toward the option. Use exactly these labels, in this order: ${options.join(", ")}.` : `Return "options" as an empty list.`}`,
     }
   },
 
@@ -162,10 +160,17 @@ function avoiding(labels) {
   return labels.length ? `\nDo not repeat or closely echo: ${labels.join(", ")}.` : ""
 }
 
-function mixTask(mode) {
-  return mode === "write"
+/** What to do with the spot: blend the pulls, or, with only references pinned, work those in. */
+function mixTask(mode, pulls, refs) {
+  if (!pulls.length && refs.length) {
+    return mode === "write"
+      ? `Write new text to insert at the empty [[]] that brings in what the references below say, in the writer's own voice.`
+      : `Rewrite the marked passage so that it brings in what the references below say. Keep the writer's voice and what the passage already says.`
+  }
+  const task = mode === "write"
     ? `Write new text to insert at the empty [[]], combining these moves (the percentage is how much each should shape it, the length in brackets is how long the result should be):`
     : `Rewrite the marked passage as a blend of these directions, each with how strongly it should pull (100% = fully committed):`
+  return `${task}\n${mixOf(pulls)}`
 }
 
 function mixOf(pulls) {
@@ -175,7 +180,7 @@ function mixOf(pulls) {
 
 function sourcesOf(refs) {
   if (!refs.length) return ""
-  return `\nDraw on these references from the writer's own documents, using only what they say:\n${refs.map((ref) => `[${ref.title}] ${ref.text}`).join("\n")}`
+  return `\nDraw on these references from the writer's own documents, using only what they say. Every one of them must show in the result, which may grow longer than the marked passage to fit them:\n${refs.map((ref) => `[${ref.title}] ${ref.text}`).join("\n")}`
 }
 
 function libraryOf(library) {

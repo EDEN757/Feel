@@ -659,6 +659,6 @@ function frame(t) {
     askInput.style.height = "";
     if (typing) askInput.style.height = `${askInput.scrollHeight}px`;
   }
-  const view = { open: isOpen(), set: currentSet(), aim, mouse, pins: seg?.pins ?? [], names: names(), panel: refsEl.classList.contains("show"), overPanel: overPanel(mouse.x), onPin: !!nearPin(mouse.x, mouse.y) };
+  const view = { open: isOpen(), set: currentSet(), aim, mouse, pins: seg?.pins ?? [], names: names(), panel: refsEl.classList.contains("show"), overPanel: overPanel(mouse.x), onPin: !!nearPin(mouse.x, mouse.y), busy: !!seg && !!(seg.waiting || seg.asking || seg.loading) };
   try { draw(t, view); } catch (error) { console.error(error); }
 }

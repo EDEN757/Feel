@@ -64,3 +64,13 @@ test("the grid asks for nothing extra when every option is pinned", () => {
   assert.ok(!user.includes("further options"))
 })
 
+test("with only documents pinned, the model is told to work them in, not to stay close to the original", () => {
+  const refs = [{ title: "notes", text: "Four teams use it." }]
+  for (const kind of ["compose", "grid"]) {
+    const { user } = PROMPTS[kind]({ ...payload, mode: "edit", pulls: [], pins: [], options: ["bolder"], refs })
+    assert.ok(!user.includes("stay close to the original"), kind)
+    assert.ok(user.includes("brings in what the references below say"), kind)
+  }
+  assert.ok(PROMPTS.grid({ ...payload, mode: "edit", pins: [], options: ["bolder"], refs }).user.includes("including what it took from the references"))
+})
+

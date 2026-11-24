@@ -27,6 +27,23 @@ if (!isDemo) {
   if (track) lineUp(track)
 }
 
+document.querySelector("#scrollCue")?.addEventListener("click", (event) => {
+  event.preventDefault()
+  glideTo(document.querySelector("#clips"))
+})
+
+/** Scrolls to an element quickly at first, then slowing as it arrives. */
+function glideTo(target, ms = 1100) {
+  const from = scrollY, to = from + target.getBoundingClientRect().top - 70
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return scrollTo(0, to)
+  const started = performance.now()
+  requestAnimationFrame(function step(now) {
+    const t = Math.min(1, (now - started) / ms)
+    scrollTo(0, from + (to - from) * (1 - (1 - t) ** 4))
+    if (t < 1) requestAnimationFrame(step)
+  })
+}
+
 addEventListener("message", (event) => {
   if (event.origin !== location.origin || typeof event.data?.feeling !== "string") return
   steps?.querySelector(`[data-step="${CSS.escape(event.data.feeling)}"]`)?.classList.add("done")
