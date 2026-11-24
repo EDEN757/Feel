@@ -4,7 +4,9 @@ See what you would get before you ask for it.
 
 Working with a language model on a text usually goes like this: you describe what you want, read the answer, find it is not quite right, describe it again, and repeat. Most of the effort goes into making the model understand you.
 
-feel turns that around. Models are now fast enough to answer while your hand is still moving, so the interface shows you the versions of your text instead of asking you to describe one. You select some words, a ring opens around the screen, and the passage changes as you move across it. You stop explaining what is right and what is wrong. You look, and you choose a direction.
+feel is a research project in UX. It follows one trend: language models are getting faster, and at some point they will answer faster than you can move your hand. It asks what working with a model should feel like once that is true.
+
+Its answer is to show you the versions of your text instead of asking you to describe one. You select some words, a ring opens around the screen, and the passage changes as you move across it. You stop explaining what is right and what is wrong. You look, and you choose a direction.
 
 ## Why
 
@@ -61,7 +63,7 @@ Click between words instead of selecting them. The ring now offers moves, such a
 
 Seeing the change live only works if the answer is there when the cursor arrives. Two things make that possible.
 
-The model runs on [Cerebras](https://cloud.cerebras.ai), which answers fast enough to keep up with a moving hand.
+The model runs on [Cerebras](https://cloud.cerebras.ai), one of the few providers that already serves models at the speed this project expects to become normal.
 
 The interface also asks ahead of need, in the way [Spaceship](https://github.com/chuanqisun/spaceship) does. When you select a passage it requests the meanings at every strength, the shorter versions, and the next set of meanings. Each time you pin something, it requests what every further move would give. Replies are remembered by exact request, so asking early and asking for real share one call.
 
