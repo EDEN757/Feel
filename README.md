@@ -11,8 +11,8 @@ You need [Node.js](https://nodejs.org) 18 or newer and git. There is nothing to 
 1. Get the code:
 
    ```bash
-   git clone https://github.com/EDEN757/feeling_llm.git
-   cd feeling_llm
+   git clone https://github.com/EDEN757/feel.git
+   cd feel
    ```
 
 2. Start it:
@@ -70,7 +70,6 @@ src/llm/index.js         one door to the model: cache, queue, key storage
 src/llm/prompts.js       what the model is asked, per request kind
 src/llm/cerebras.js      the Cerebras client
 src/llm/simulator.js     canned replies for running without a key
-explorations/            earlier sketches of the interaction (simulator only)
 scripts/serve.mjs        static server for local development
 tests/                   run with `npm test`
 ```

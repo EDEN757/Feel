@@ -3,7 +3,7 @@
  * It only knows the sample letter well; on other text its changes are crude.
  */
 
-const DELAY_MS = { bloom: 350, moves: 350, prompt: 450, grid: 250, shrinks: 200, compose: 150, blend: 150, custom: 300 }
+const DELAY_MS = { bloom: 350, moves: 350, prompt: 450, grid: 250, shrinks: 200, compose: 150 }
 const SHRINK_RUNGS = 5
 
 const ROUTES = {
@@ -27,9 +27,6 @@ const ROUTES = {
   },
   prompt: ({ mode, text, start, end, prompt, keep = [], refs = [], count = 6, apply = true }) =>
     apply ? mockPrompt(mode, text.slice(start, end), prompt, keep, refs, count) : mockSteer(mode, text.slice(start, end), prompt, keep, count),
-  /** Used only by the earlier sketches in explorations/. */
-  blend: ({ text, start, end, pulls }) => ({ text: mockBlend(text.slice(start, end), pulls) }),
-  custom: ({ text, start, end, label }) => ({ direction: mockDirection(text.slice(start, end), label) }),
 }
 
 export async function simulate(route, payload) {
