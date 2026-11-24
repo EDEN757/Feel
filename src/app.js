@@ -1,27 +1,31 @@
+/**
+ * The writing surface: the text, the passage being shaped, and what each gesture does to it.
+ * Selecting or clicking opens a passage; moving on the ring aims at a meaning; clicking pins it;
+ * typing asks in words; Enter saves. The ring itself is drawn by ring.js from what is decided here.
+ */
+
 import { pilot, startAutopilot } from "./autopilot.js";
 import { diffWords } from "./diff.js";
-import "./landing.js";
 import { documents } from "./documents.js";
-import { SAMPLE } from "./sample.js";
-import { createSound } from "./sound.js";
+import { $, span, toast } from "./dom.js";
+import { begin } from "./key.js";
+import "./landing.js";
 import { isLive, request as api, settings } from "./llm/index.js";
+import { createPanel } from "./panel.js";
+import { H, PANEL, W, bandPoint, draw, easeOut, ellipsePoint, flash, fold, locate, panelOut, plant, relabel, trace, unfold } from "./ring.js";
+import { SAMPLE } from "./sample.js";
+import { createShortener } from "./shorten.js";
+import { createSound } from "./sound.js";
 
 const NAMES = { edit: ["", "slight", "medium", "strong"], write: ["", "phrase", "sentence", "paragraph"] };
 const KEYS = ["", "slight", "medium", "strong"];
 const MEANINGS = 6, MAX_MEANINGS = 8;
-const INNER = 0.42, OUTER = 0.96;
-const BLEND_DEGREES = 7;
 const SCROLL_PAUSE = 450;
-const PANEL = 330, EDGE = 26;
-const COMBO_WINDOW = 320;
+/** Pushing the cursor this close to the right edge slides the documents out. */
+const EDGE = 26;
 const MAX_PINS = 4;
 
-const $ = (id) => document.getElementById(id);
-const canvas = $("screen"), ctx = canvas.getContext("2d");
-const textEl = $("text"), hintEl = $("hint"), statusEl = $("status"), toastEl = $("toast"), askEl = $("ask"), askInput = $("askInput"), askedEl = $("asked");
-const refsEl = $("refs"), meterEl = $("meter");
-
-let W = 0, H = 0, RX = 0, RY = 0, CX = 0, CY = 0;
+const textEl = $("text"), hintEl = $("hint"), statusEl = $("status"), askEl = $("ask"), askInput = $("askInput"), askedEl = $("asked");
 const TEXT_STORAGE = "feeling-text";
 /** Inside the front page's tour the app runs on the sample letter and the simulator, and leaves the saved text alone. */
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -39,46 +43,27 @@ let home = !text || SMALL;
 let seg = null;
 let changes = 0;
 let mouse = { x: -1, y: -1 };
-let trail = [];
 let aim = null;
-let openT = 0, labelT = 0, refsT = 0;
-let glow = [];
-let flashes = [], planted = [], particles = [];
-let collapse = null;
 let scrollLock = 0;
 let downAt = null;
-const shrinkState = { pending: 0, combo: 0, lastAt: 0, timer: null, busy: false };
 const sound = createSound();
 
-buildDocs();
-resize();
-addEventListener("resize", resize);
+const panel = createPanel({
+  pinned: () => seg?.pins.filter((p) => p.kind === "ref").map((p) => p.text) ?? [],
+  onDelete(doc) {
+    if (!seg) return;
+    seg.pins = seg.pins.filter((p) => p.doc !== doc);
+    refreshPreview();
+  },
+});
+const refsEl = panel.el;
+const shortener = createShortener({ passage: () => seg, text: () => text, setText, renderText, reload: loadSet, notify, sound });
+
 render();
 requestAnimationFrame(frame);
-
 function isOpen() { return !!seg && !seg.done && !!currentSet()?.length; }
 function currentSet() { return seg?.sets?.[seg.setIndex] ?? null; }
 function names() { return NAMES[seg?.mode === "write" && !seg?.prompt ? "write" : "edit"]; }
-
-function resize() {
-  const dpr = devicePixelRatio || 1;
-  W = innerWidth; H = innerHeight;
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  layoutRing();
-}
-
-/** The ring shrinks to the left while the references panel is out. */
-function layoutRing() {
-  CX = W / 2; CY = H / 2;
-  RX = Math.max(60, W / 2 - Math.max(110, W * 0.1));
-  RY = Math.max(60, H / 2 - 64);
-}
-
-function buildDocs() {
-  $("docs").innerHTML = documents.all.map((d, i) => `<div class="doc"><h3>${esc(d.title)}<button class="remove" data-doc="${i}" title="delete this document">×</button></h3>${d.paragraphs.map((p, j) => `<p data-doc="${i}" data-para="${j}">${esc(p)}</p>`).join("")}</div>`).join("") || `<p class="note">no documents yet</p>`;
-  renderPanel();
-}
 
 function stored() {
   try { return localStorage.getItem(TEXT_STORAGE) ?? ""; } catch { return ""; }
@@ -130,7 +115,7 @@ function render() {
     const arrows = seg.mode === "edit" ? " · <b>← ↓</b> shorter, tap fast for more · <b>→ ↑</b> back (when the ask bar is empty)" : "";
     hintEl.innerHTML = `<b>move</b> toward ${what} · <b>click</b> to pin${pins} · <b>↵</b> save${arrows}<br><b>scroll</b> ↓ new ${seg.mode === "write" ? "moves" : "meanings"} ↑ back (${seg.setIndex + 1}/${seg.sets.length}) · push the <b>right edge</b> for references · <b>type</b> to ask (↵ changes the text, ⇧↵ only the ring) · <b>esc</b> cancel`;
   }
-  renderPanel();
+  panel.render();
   renderAsk();
 }
 
@@ -165,14 +150,6 @@ function renderText() {
   textEl.append(before, mid, after);
 }
 
-function span(t) { const s = document.createElement("span"); s.textContent = t; return s; }
-
-function toast(message) {
-  toastEl.textContent = message;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (toastEl.textContent = ""), 4000);
-}
-
 /* ---------- starting: select to edit, click to write ---------- */
 
 textEl.addEventListener("mousedown", (e) => { downAt = { x: e.clientX, y: e.clientY }; });
@@ -205,14 +182,14 @@ textEl.addEventListener("mouseup", (e) => {
 
 function open(fields) {
   seg = { ...fields, current: fields.original, preview: null, sets: [], setIndex: 0, pins: [], history: [] };
-  openT = 0;
+  unfold();
   sound.wake();
   notify(seg.mode === "write" ? "write" : "select");
   if (!isLive() && !DEMO && !SAMPLE.includes(text.slice(0, 60)) && !open.warned) {
     open.warned = true;
     toast("simulator: it only knows the sample letter, so changes here are rough. Add a key for a real model.");
   }
-  if (seg.mode === "edit") ahead(ladderOf(seg, true).versions);
+  if (seg.mode === "edit") shortener.prepare(seg);
   render();
   centerOn(textEl.querySelector(".seg, .ghost"));
   loadSet(seg);
@@ -259,8 +236,7 @@ async function loadSet(target) {
     if (replacing) { target.sets = []; target.stale = false; }
     target.sets.push(directions.slice(0, MAX_MEANINGS).map((d) => ({ ...d, kind: "suggested", basis: basisOf(target) })));
     target.setIndex = target.sets.length - 1;
-    labelT = 0;
-    glow = [];
+    relabel();
     ahead(api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: target.sets.flat().map((d) => d.label) }, { ahead: true }));
   } catch (error) {
     toast(error.message);
@@ -270,29 +246,15 @@ async function loadSet(target) {
   render();
 }
 
-
 /** Marks a request as made ahead of need: its reply is remembered, and a failure can wait until it is asked for again. */
 function ahead(reply) { reply.catch(() => {}); }
 
 /* ---------- aiming, pins and combining ---------- */
 
 function aimAt(x, y) {
-  const set = currentSet();
-  const n = set?.length ?? 0;
-  if (!n || overPanel(x)) return null;
-  const nx = (x - CX) / RX, ny = (y - CY) / RY;
-  const q = Math.hypot(nx, ny);
-  const u = (q - INNER) / (OUTER - INNER);
-  const level = u <= 0 ? 0 : u < 1 / 3 ? 1 : u < 2 / 3 ? 2 : 3;
-  let deg = (Math.atan2(ny, nx) * 180) / Math.PI + 90;
-  deg = ((deg % 360) + 360) % 360;
-  const span = 360 / n;
-  const index = Math.floor(deg / span) % n;
-  const within = deg - index * span;
-  let blendWith = null;
-  if (within < BLEND_DEGREES) blendWith = (index - 1 + n) % n;
-  else if (span - within < BLEND_DEGREES) blendWith = (index + 1) % n;
-  return { index, level, q, deg, blendWith: level ? blendWith : null };
+  const count = currentSet()?.length ?? 0;
+  if (!count || overPanel(x)) return null;
+  return locate(x, y, count);
 }
 
 function overPanel(x) { return refsEl.classList.contains("show") && x > W - PANEL; }
@@ -304,7 +266,7 @@ function updateAim() {
   if (next && aim && next.level && next.index !== aim.index) sound.meaning(next.index);
   if (next && next.level !== (aim?.level ?? 0) && next.level) {
     sound.tick(next.level);
-    flashes.push({ index: next.index, q: INNER + ((OUTER - INNER) * (next.level - 1)) / 3, born: performance.now() });
+    flash(next.index, next.level);
   }
   const changed = !same(next, aim);
   aim = next;
@@ -400,7 +362,7 @@ async function askFor(query, apply = true) {
     if (!apply) {
       target.sets.push(directions.map((d) => ({ ...d, kind: d.kept ? "kept" : "suggested", basis: basisOf(target) })));
       target.setIndex = target.sets.length - 1;
-      labelT = 0; glow = []; aim = null;
+      relabel(); aim = null;
       sound.swap();
       return;
     }
@@ -409,7 +371,7 @@ async function askFor(query, apply = true) {
     target.pins = target.pins.filter((p) => p.kind === "ref");
     target.sets.push(directions.map((d) => ({ ...d, kind: d.kept ? "kept" : "suggested", basis: result })));
     target.setIndex = target.sets.length - 1;
-    labelT = 0; glow = []; aim = null;
+    relabel(); aim = null;
     sound.swap();
   } catch (error) { toast(error.message); }
   finally {
@@ -449,12 +411,12 @@ function refreshPreview() {
 }
 
 function nearPin(x, y) {
-  return seg?.pins.find((p) => (p.kind !== "ref" || refsT < 0.5) && Math.hypot(p.x - x, p.y - y) < 14) ?? null;
+  return seg?.pins.find((p) => (p.kind !== "ref" || panelOut() < 0.5) && Math.hypot(p.x - x, p.y - y) < 14) ?? null;
 }
 
 addEventListener("mousemove", (e) => {
   mouse = { x: e.clientX, y: e.clientY };
-  trail.push({ x: mouse.x, y: mouse.y, at: performance.now() });
+  trace(mouse.x, mouse.y);
   if (isOpen()) {
     const wantPanel = mouse.x > W - EDGE || (refsEl.classList.contains("show") && mouse.x > W - PANEL - 40) || refsEl.contains(document.activeElement);
     refsEl.classList.toggle("show", wantPanel);
@@ -463,7 +425,7 @@ addEventListener("mousemove", (e) => {
 });
 
 addEventListener("wheel", (e) => {
-  if (!isOpen() || seg.loading || e.target.closest("#refs")) return;
+  if (!isOpen() || seg.loading || e.target.closest?.("#refs")) return;
   e.preventDefault();
   const now = performance.now();
   if (now < scrollLock || Math.abs(e.deltaY) < 4) return;
@@ -476,8 +438,7 @@ addEventListener("wheel", (e) => {
 }, { passive: false });
 
 function swapped() {
-  labelT = 0;
-  glow = [];
+  relabel();
   aim = null;
   render();
   updateAim();
@@ -499,9 +460,9 @@ addEventListener("mousedown", (e) => {
     if (existing) { seg.pins = seg.pins.filter((p) => p !== existing); sound.unpin(); }
     else {
       seg.pins.push({ kind: "ref", doc, text: passage, homeY: e.clientY, born: performance.now(), level: 1,
-        get x() { return W - 8 - PANEL * easeOut(refsT); },
+        get x() { return W - 8 - PANEL * easeOut(panelOut()); },
         get y() {
-          const el = refsT > 0.5 && [...refsEl.querySelectorAll(".doc p")].find((p) => p.textContent === this.text);
+          const el = panelOut() > 0.5 && [...refsEl.querySelectorAll(".doc p")].find((p) => p.textContent === this.text);
           if (!el) return this.homeY;
           const r = el.getBoundingClientRect();
           return Math.max(24, Math.min(H - 24, r.top + Math.min(r.height / 2, 14)));
@@ -515,7 +476,7 @@ addEventListener("mousedown", (e) => {
     seg.pins.push({ ...pullOf(a), q: a.q, deg: a.deg, born: performance.now(),
       get x() { return ellipsePoint(this.q, this.deg)[0]; },
       get y() { return ellipsePoint(this.q, this.deg)[1]; } });
-    planted.push({ x: e.clientX, y: e.clientY, born: performance.now(), level: a.level });
+    plant(e.clientX, e.clientY, a.level);
     sound.plant(a.level);
     notify("pin");
   }
@@ -527,7 +488,7 @@ async function save() {
   const target = seg;
   const pulls = target.pins.length ? target.pins : aim?.level ? [pullOf(aim)] : [];
   if (!pulls.length && !target.prompt) return toast(target.mode === "write" ? "pin a move, point at one, or type what you want" : "pin a meaning, point at one, or type what you want");
-  collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: target.pins.map((p) => ({ x: p.x, y: p.y })) };
+  fold(currentSet(), target.pins.map((p) => ({ x: p.x, y: p.y })));
   sound.save(pulls.length);
   notify("save");
   target.preview = null;
@@ -552,148 +513,13 @@ function finish(target, fade) {
 }
 
 function cancel() {
-  collapse = { set: currentSet(), born: performance.now(), x: CX, y: CY, pins: [] };
+  fold(currentSet(), []);
   seg = null;
   aim = null;
   askInput.blur(); askInput.value = "";
   refsEl.classList.remove("show");
   render();
 }
-
-/* ---------- shorter with the arrow keys ---------- */
-
-function shrinkKey(direction) {
-  if (seg.mode !== "edit") return;
-  if (direction > 0) return grow();
-  const now = performance.now();
-  shrinkState.combo = now - shrinkState.lastAt < COMBO_WINDOW ? shrinkState.combo + 1 : 1;
-  shrinkState.lastAt = now;
-  shrinkState.pending += 0.5 + 0.5 * Math.min(shrinkState.combo, 3);
-  showMeter();
-  sound.charge(shrinkState.combo);
-  clearTimeout(shrinkState.timer);
-  shrinkState.timer = setTimeout(runShrink, 170);
-}
-
-/** Five shorter versions of the passage, asked for when it is selected so the arrows answer at once. */
-function ladderOf(target, early = false) {
-  target.ladder ??= { rung: 0, passage: { text, start: target.start, end: target.end } };
-  target.ladder.versions = api("shrinks", target.ladder.passage, { ahead: early }).then((reply) => reply.versions);
-  return target.ladder;
-}
-
-async function runShrink() {
-  if (shrinkState.busy || !seg || seg.mode !== "edit") return;
-  const steps = Math.max(1, Math.round(shrinkState.pending));
-  shrinkState.pending = 0;
-  shrinkState.busy = true;
-  const target = seg, before = target.original;
-  try {
-    let ladder = ladderOf(target), versions = await ladder.versions;
-    if (ladder.rung >= versions.length) {
-      target.ladder = null;
-      ladder = ladderOf(target);
-      versions = await ladder.versions;
-    }
-    const rung = Math.min(versions.length, ladder.rung + steps);
-    const shorter = versions.slice(ladder.rung, rung).findLast((version) => version && version.length < before.length);
-    if (seg === target && shorter) {
-      target.history.push({ text: before, rung: ladder.rung });
-      ladder.rung = rung;
-      await shatter(target, before, shorter);
-      notify("shorter");
-    }
-  } catch (error) { toast(error.message); }
-  shrinkState.busy = false;
-  showMeter();
-  if (shrinkState.pending) runShrink();
-}
-
-/** The words that go turn into white boxes, then break apart; the new wording flashes in. */
-async function shatter(target, before, after) {
-  target.prompt = null;
-  target.promptFrom = null;
-  target.pins = [];
-  target.preview = null;
-  target.doomedFrom = after;
-  renderText();
-  sound.crack();
-  await wait(150);
-  const boxes = [...textEl.querySelectorAll(".doomed")].flatMap((el) => [...el.getClientRects()]);
-  for (const r of boxes) burst(r);
-  sound.shatter(boxes.length);
-  setText(text.slice(0, target.start) + after + text.slice(target.end));
-  target.end = target.start + after.length;
-  target.doomedFrom = null;
-  target.bornFrom = before;
-  target.original = target.current = after;
-  renderBorn(target, before, after);
-  reloadSoon(target);
-}
-
-function renderBorn(target, before, after) {
-  renderText();
-  const mid = textEl.querySelector(".seg");
-  if (!mid) return;
-  mid.innerHTML = "";
-  for (const part of diffWords(before, after)) {
-    const w = span(part.text);
-    if (part.changed) w.className = "born";
-    mid.append(w);
-  }
-}
-
-function grow() {
-  const target = seg;
-  const entry = target.history.pop();
-  if (!entry) return toast("nothing to bring back");
-  const previous = entry.text;
-  if (target.ladder) target.ladder.rung = entry.rung;
-  setText(text.slice(0, target.start) + previous + text.slice(target.end));
-  target.end = target.start + previous.length;
-  const before = target.original;
-  target.original = target.current = previous;
-  target.pins = []; target.preview = null;
-  sound.grow();
-  renderBorn(target, before, previous);
-  showMeter();
-  reloadSoon(target);
-}
-
-function reloadSoon(target) {
-  clearTimeout(target.reloadTimer);
-  target.reloadTimer = setTimeout(() => {
-    if (seg !== target) return;
-    target.stale = true;
-    loadSet(target);
-  }, 700);
-}
-
-function showMeter() {
-  if (!seg) return;
-  const base = seg.history[0]?.text ?? seg.original;
-  const words = (t) => t.split(/\s+/).filter(Boolean).length;
-  const ratio = 1 - words(seg.original) / Math.max(1, words(base));
-  const blocks = Math.min(10, Math.round(ratio * 10));
-  const combo = shrinkState.combo > 1 && performance.now() - shrinkState.lastAt < COMBO_WINDOW * 2 ? `  combo ×${shrinkState.combo}` : "";
-  meterEl.textContent = `shorter ${"■".repeat(blocks)}${"□".repeat(10 - blocks)} −${Math.round(ratio * 100)}%${combo}`;
-  meterEl.classList.toggle("show", ratio > 0 || shrinkState.pending > 0);
-  clearTimeout(showMeter.timer);
-  showMeter.timer = setTimeout(() => meterEl.classList.remove("show"), 1800);
-}
-
-function burst(r) {
-  const count = Math.max(6, Math.min(40, Math.round((r.width * r.height) / 60)));
-  for (let i = 0; i < count; i++) {
-    particles.push({
-      x: r.left + Math.random() * r.width, y: r.top + Math.random() * r.height,
-      vx: (Math.random() - 0.5) * 7, vy: -Math.random() * 5 - 1,
-      size: 2 + Math.random() * 4, born: performance.now(), life: 600 + Math.random() * 600, spin: Math.random() * 0.4 - 0.2, angle: 0,
-    });
-  }
-}
-
-function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
 /* ---------- keys ---------- */
 
@@ -716,7 +542,7 @@ addEventListener("keydown", (e) => {
   if (ARROWS[e.key]) {
     e.preventDefault();
     if (askInput.value) return moveInAsk(e.key);
-    return shrinkKey(ARROWS[e.key]);
+    return shortener.key(ARROWS[e.key]);
   }
   if (e.key === "/" || (e.key.length === 1 && /\p{L}|\p{N}/u.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey)) {
     e.preventDefault();
@@ -727,7 +553,7 @@ addEventListener("keydown", (e) => {
 
 askInput.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { askInput.value = ""; askInput.blur(); return; }
-  if (ARROWS[e.key] && !askInput.value) { e.preventDefault(); return shrinkKey(ARROWS[e.key]); }
+  if (ARROWS[e.key] && !askInput.value) { e.preventDefault(); return shortener.key(ARROWS[e.key]); }
   if (e.key !== "Enter") return;
   e.preventDefault();
   const query = askInput.value.trim();
@@ -760,17 +586,6 @@ function leaveHome() {
   scrollTo(0, 0);
 }
 
-/** The first time someone starts without a key, asks whether they want a real model or the simulator. */
-const CHOSEN_STORAGE = "feeling-mode-chosen";
-let afterChoice = null;
-function begin(action) {
-  let chosen = true;
-  try { chosen = !!localStorage.getItem(CHOSEN_STORAGE); } catch {}
-  if (settings.apiKey || chosen) return action();
-  afterChoice = action;
-  openKeyDialog(true);
-}
-
 $("edit").addEventListener("click", () => setEditing(!document.body.classList.contains("editing")));
 $("home").addEventListener("click", () => {
   if (document.body.classList.contains("editing")) setEditing(false);
@@ -790,42 +605,10 @@ addEventListener("keydown", (e) => {
   e.preventDefault();
   undo(!e.shiftKey);
 });
-const keyDialog = $("keyDialog");
-/** As a first-time choice the dialog offers the simulator instead of "cancel"; from the top bar it manages the key. */
-function openKeyDialog(asChoice) {
-  $("keyTitle").textContent = asChoice ? "a real model, or the simulator?" : "go live with Cerebras";
-  $("keyCancel").textContent = asChoice ? "use the simulator" : "cancel";
-  $("keySave").textContent = asChoice ? "use this key" : "save";
-  $("keyRemove").hidden = asChoice;
-  $("keyInput").value = settings.apiKey;
-  $("modelInput").value = settings.model;
-  keyDialog.returnValue = "";
-  keyDialog.showModal();
-}
-$("live").addEventListener("click", () => openKeyDialog(false));
-keyDialog.addEventListener("close", () => {
-  if (keyDialog.returnValue === "save") settings.save({ apiKey: $("keyInput").value, model: $("modelInput").value });
-  if (keyDialog.returnValue === "remove") settings.save({ apiKey: "", model: "" });
-  renderLive();
-  if (!afterChoice) return;
-  const action = afterChoice;
-  afterChoice = null;
-  try { localStorage.setItem(CHOSEN_STORAGE, "yes"); } catch {}
-  action();
-});
-renderLive();
-settings.onPause = (ms) => toast(`rate limit reached: trying again in ${Math.ceil(ms / 1000)}s`);
-
-function renderLive() { $("live").textContent = isLive() ? `live · ${settings.model}` : "simulator · add key"; }
 
 $("sound").addEventListener("click", () => { sound.toggle(); renderSound(); });
 renderSound();
 function renderSound() { $("sound").textContent = sound.muted ? "sound off" : "sound on"; }
-
-function renderPanel() {
-  const pinned = new Set(seg?.pins.filter((p) => p.kind === "ref").map((p) => p.text) ?? []);
-  for (const p of refsEl.querySelectorAll(".doc p")) p.classList.toggle("pinned", pinned.has(p.textContent));
-}
 
 /* ---------- the tour ---------- */
 
@@ -836,10 +619,8 @@ if (CLIP) {
     isBusy: () => !!seg && (seg.waiting || seg.asking || seg.loading),
     select(start, end) { forget(); open({ mode: "edit", start, end, original: text.slice(start, end) }); },
     writeAt(offset) { forget(); open({ mode: "write", start: offset, end: offset, original: "" }); },
-    /** A spot in a strength band on one arc of the ring; `across` runs from one side of the arc (0) to the other (1). */
     point(index, level, across = 0.5) {
-      const count = currentSet().length;
-      return ellipsePoint(INNER + ((OUTER - INNER) * (level - 0.5)) / 3, ((index + across) * 360) / count);
+      return bandPoint(index, level, across, currentSet().length);
     },
     /** Where a stretch of the text sits on screen. Closes any open passage first, so the text is one plain run. */
     rects(start, end) {
@@ -863,38 +644,7 @@ if (CLIP) {
   }, CLIP);
 }
 
-/* ---------- your documents ---------- */
-
-$("documents").addEventListener("click", () => refsEl.classList.toggle("show"));
-$("refsClose").addEventListener("click", () => refsEl.classList.remove("show"));
-
-$("docs").addEventListener("click", (e) => {
-  const button = e.target.closest(".remove");
-  if (!button) return;
-  if (!button.classList.contains("armed")) {
-    button.classList.add("armed");
-    button.textContent = "delete?";
-    return;
-  }
-  const doc = documents.all[+button.dataset.doc];
-  if (seg) seg.pins = seg.pins.filter((p) => p.doc !== doc);
-  documents.remove(+button.dataset.doc);
-  buildDocs();
-  if (seg) refreshPreview();
-});
-
-const docForm = $("docForm");
-$("docAdd").addEventListener("click", () => { docForm.hidden = false; $("docAdd").hidden = true; $("docTitle").focus(); });
-$("docCancel").addEventListener("click", closeDocForm);
-docForm.addEventListener("submit", (e) => {
-  e.preventDefault();
-  if (!documents.add($("docTitle").value, $("docBody").value)) return toast("paste or type some text first");
-  buildDocs();
-  closeDocForm();
-});
-function closeDocForm() { docForm.reset(); docForm.hidden = true; $("docAdd").hidden = false; }
-
-/* ---------- drawing ---------- */
+/* ---------- every frame ---------- */
 
 function frame(t) {
   requestAnimationFrame(frame);
@@ -905,254 +655,6 @@ function frame(t) {
     askInput.style.height = "";
     if (typing) askInput.style.height = `${askInput.scrollHeight}px`;
   }
-  try { draw(t); } catch (error) { console.error(error); }
+  const view = { open: isOpen(), set: currentSet(), aim, mouse, pins: seg?.pins ?? [], names: names(), panel: refsEl.classList.contains("show"), overPanel: overPanel(mouse.x), onPin: !!nearPin(mouse.x, mouse.y) };
+  try { draw(t, view); } catch (error) { console.error(error); }
 }
-
-function draw(t) {
-  const time = t / 1000;
-  const open = isOpen();
-  openT += ((open ? 1 : 0) - openT) * (open ? 0.07 : 0.2);
-  if (open && openT > 0.995) openT = 1;
-  labelT = Math.min(1, labelT + 0.035);
-  refsT += ((refsEl.classList.contains("show") ? 1 : 0) - refsT) * 0.12;
-  layoutRing();
-  ctx.clearRect(0, 0, W, H);
-  if (open) drawRing(currentSet(), openT, time);
-  drawCollapse();
-  if (open) drawPins(time);
-  drawPlanted();
-  drawParticles();
-  if (open && !overPanel(mouse.x)) drawCursor();
-  
-}
-
-function ellipsePoint(q, deg) {
-  const a = ((deg - 90) * Math.PI) / 180;
-  return [CX + Math.cos(a) * RX * q, CY + Math.sin(a) * RY * q];
-}
-
-function arcPath(q, from, to) {
-  ctx.beginPath();
-  const step = Math.max(0.5, (to - from) / 60);
-  for (let d = from; d <= to + 0.001; d += step) {
-    const [x, y] = ellipsePoint(q, Math.min(d, to));
-    d === from ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-}
-
-function sectorPath(q0, q1, from, to) {
-  ctx.beginPath();
-  for (let d = from; d <= to; d += 1) { const [x, y] = ellipsePoint(q1, d); d === from ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
-  for (let d = to; d >= from; d -= 1) { const [x, y] = ellipsePoint(q0, d); ctx.lineTo(x, y); }
-  ctx.closePath();
-}
-
-function drawRing(set, t, time) {
-  if (!set?.length) return;
-  const n = set.length, span = 360 / n, gap = 1.4;
-  const sweep = easeOut(t) * 360;
-  const now = performance.now();
-  while (glow.length < n) glow.push(0);
-  drawIdleSweep(time, n, span);
-
-  set.forEach((d, i) => {
-    const from = i * span + gap, to = (i + 1) * span - gap;
-    const target = !aim?.level ? 0 : aim.index === i ? 1 : aim.blendWith === i ? 0.7 : 0;
-    glow[i] += (target - glow[i]) * 0.18;
-    const g = glow[i];
-    const end = Math.min(to, sweep);
-    if (end <= from) return;
-
-    if (g > 0.02 && aim?.level) {
-      const qc = Math.min(aim.q, OUTER);
-      const grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(RX, RY) * qc);
-      grad.addColorStop(0, "rgba(255,255,255,0)");
-      grad.addColorStop(1, `rgba(255,255,255,${0.07 * g})`);
-      sectorPath(INNER, qc, from, to); ctx.fillStyle = grad; ctx.fill();
-      const stepQ = 0.05, phase = (time * 0.08) % stepQ;
-      for (let q = INNER + phase; q < qc; q += stepQ) {
-        const k = (q - INNER) / Math.max(0.001, qc - INNER);
-        ctx.strokeStyle = `rgba(255,255,255,${(0.04 + 0.3 * k * k) * g})`;
-        ctx.lineWidth = 1;
-        arcPath(q, from + 1, to - 1); ctx.stroke();
-      }
-      for (let k = 1; k <= 2; k++) {
-        const qq = INNER + ((OUTER - INNER) * k) / 3;
-        const passed = aim.level > k;
-        ctx.strokeStyle = `rgba(255,255,255,${(passed ? 0.55 : 0.18) * g})`;
-        ctx.setLineDash(passed ? [] : [2, 6]); ctx.lineWidth = passed ? 1.2 : 1;
-        arcPath(qq, from, to); ctx.stroke(); ctx.setLineDash([]);
-      }
-    }
-
-    ctx.strokeStyle = `rgba(255,255,255,${(0.24 + 0.76 * g) * Math.min(1, t * 1.4)})`;
-    ctx.lineWidth = 1 + 1.6 * g;
-    arcPath(OUTER, from, end); ctx.stroke();
-
-    const mid = (from + to) / 2;
-    const reached = Math.max(0, Math.min(1, (sweep - from) / Math.max(1, to - from)));
-    const label = d.label;
-    const typed = label.slice(0, Math.ceil(label.length * Math.min(reached, labelT * 1.4)));
-    const [lx, ly] = ellipsePoint(OUTER + 0.045, mid);
-    ctx.font = `${g > 0.5 ? 500 : 400} 12px 'IBM Plex Mono', monospace`;
-    ctx.textAlign = Math.abs(lx - CX) < 30 ? "center" : lx < CX ? "right" : "left";
-    ctx.fillStyle = `rgba(255,255,255,${0.45 + 0.55 * g})`;
-    ctx.fillText(typed + (typed.length < label.length && typed.length ? "█" : ""), lx, ly + 4);
-    /* The strength goes on the label's far side from the ring: above it for arcs in the top half, below it otherwise. */
-    const strengthY = ly < CY - RY * 0.3 ? ly - 14 : ly + 22;
-    if (g > 0.5 && aim?.level && aim.index === i) ctx.fillText(`${"■".repeat(aim.level)}${"□".repeat(3 - aim.level)} ${names()[aim.level]}`, lx, strengthY);
-  });
-
-  for (let i = flashes.length - 1; i >= 0; i--) {
-    const f = flashes[i], age = (now - f.born) / 450;
-    if (age > 1 || f.index >= n) { flashes.splice(i, 1); continue; }
-    const from = f.index * span + gap, to = (f.index + 1) * span - gap;
-    ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - age)})`;
-    ctx.lineWidth = 2 * (1 - age) + 0.5;
-    arcPath(f.q + age * 0.03, from, to); ctx.stroke();
-  }
-
-  ctx.strokeStyle = `rgba(255,255,255,${0.09 * t})`;
-  ctx.setLineDash([1, 7]);
-  ctx.beginPath(); ctx.ellipse(CX, CY, RX * INNER, RY * INNER, 0, 0, Math.PI * 2); ctx.stroke();
-  ctx.setLineDash([]);
-}
-
-function drawIdleSweep(time, n, span) {
-  const idle = !aim?.level ? 1 : 0;
-  drawIdleSweep.a = (drawIdleSweep.a ?? 0) + (idle - (drawIdleSweep.a ?? 0)) * 0.05;
-  const a = drawIdleSweep.a;
-  if (a < 0.02) return;
-  const head = (time * 36) % 360;
-  for (let k = 0; k < 18; k++) {
-    const deg = head - k * 1.6;
-    const [x0, y0] = ellipsePoint(INNER, deg), [x1, y1] = ellipsePoint(OUTER, deg);
-    ctx.strokeStyle = `rgba(255,255,255,${0.09 * (1 - k / 18) * a})`;
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
-  }
-  const lit = Math.floor((((head % 360) + 360) % 360) / span) % n;
-  ctx.strokeStyle = `rgba(255,255,255,${0.12 * a})`;
-  ctx.lineWidth = 1.5;
-  arcPath(OUTER, lit * span + 1.4, (lit + 1) * span - 1.4); ctx.stroke();
-}
-
-function drawCursor() {
-  if (mouse.x < 0) return;
-  const now = performance.now();
-  trail = trail.filter((p) => now - p.at < 220);
-  trail.forEach((p) => {
-    const k = 1 - (now - p.at) / 220;
-    ctx.fillStyle = `rgba(255,255,255,${0.25 * k})`;
-    ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
-  });
-  const level = aim?.level ?? 0;
-  if (level) {
-    ctx.strokeStyle = "rgba(255,255,255,0.14)";
-    ctx.setLineDash([2, 5]);
-    const [ix, iy] = ellipsePoint(INNER, aim.deg);
-    ctx.beginPath(); ctx.moveTo(ix, iy); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
-    ctx.setLineDash([]);
-  }
-  const size = 4 + level * 2;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(mouse.x - size / 2, mouse.y - size / 2, size, size);
-}
-
-/** A bond between two points: bright at both ends, fading to nothing in the middle so it never covers the text. */
-function bond(a, b, strength) {
-  const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-  g.addColorStop(0, `rgba(255,255,255,${0.75 * strength})`);
-  g.addColorStop(0.22, `rgba(255,255,255,${0.12 * strength})`);
-  g.addColorStop(0.5, "rgba(255,255,255,0)");
-  g.addColorStop(0.78, `rgba(255,255,255,${0.12 * strength})`);
-  g.addColorStop(1, `rgba(255,255,255,${0.75 * strength})`);
-  ctx.strokeStyle = g;
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-}
-
-function drawPins(time) {
-  const pins = seg.pins;
-  for (let i = 1; i < pins.length; i++) bond(pins[i - 1], pins[i], 1);
-  if (pins.length > 2) bond(pins[pins.length - 1], pins[0], 0.45);
-  if (pins.length && aim?.level && !nearPin(mouse.x, mouse.y)) bond(pins[pins.length - 1], mouse, 0.4);
-  ctx.font = "400 10px 'IBM Plex Mono', monospace";
-  ctx.textAlign = "center";
-  for (const p of pins) {
-    // While the documents are open, the highlighted passage is the pin; the dot appears once the panel is away.
-    if (p.kind === "ref" && refsT >= 0.5) continue;
-    const hovered = Math.hypot(p.x - mouse.x, p.y - mouse.y) < 14;
-    const size = 5 + p.level * 2 + 0.8 * Math.sin(time * 2.4 + p.born);
-    ctx.fillStyle = hovered ? "rgba(255,255,255,0.45)" : "#fff";
-    if (p.kind === "ref") { ctx.beginPath(); ctx.arc(p.x, p.y, size / 1.6, 0, Math.PI * 2); ctx.fill(); }
-    else ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
-    ctx.strokeStyle = "rgba(255,255,255,0.25)";
-    ctx.strokeRect(p.x - size, p.y - size, size * 2, size * 2);
-    if (p.kind === "ref") {
-      ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillText(hovered ? "× remove" : p.doc.title, p.x - 12, p.y + 3); ctx.textAlign = "center";
-      continue;
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.55)";
-    const label = p.partner ? `${p.dir.label} + ${p.partner.label}` : p.dir.label;
-    ctx.fillText(hovered ? "× remove" : `${label} ${"■".repeat(p.level)}`, p.x, p.y + size + 14);
-  }
-}
-
-function drawCollapse() {
-  if (!collapse) return;
-  const age = (performance.now() - collapse.born) / 450;
-  if (age > 1) { collapse = null; return; }
-  const n = collapse.set?.length ?? 0;
-  const e = easeOut(age), span = 360 / Math.max(1, n);
-  ctx.save();
-  ctx.translate(collapse.x, collapse.y);
-  ctx.scale(1 - e * 0.85, 1 - e * 0.85);
-  ctx.translate(-collapse.x, -collapse.y);
-  for (let i = 0; i < n; i++) {
-    ctx.strokeStyle = `rgba(255,255,255,${0.35 * (1 - e)})`;
-    ctx.lineWidth = 1;
-    arcPath(OUTER, i * span + 1.4, (i + 1) * span - 1.4); ctx.stroke();
-  }
-  ctx.restore();
-  for (const p of collapse.pins ?? []) {
-    const x = p.x + (collapse.x - p.x) * e, y = p.y + (collapse.y - p.y) * e, size = 6 * (1 - e) + 1;
-    ctx.fillStyle = `rgba(255,255,255,${1 - e})`;
-    ctx.fillRect(x - size / 2, y - size / 2, size, size);
-  }
-}
-
-function drawPlanted() {
-  const now = performance.now();
-  planted = planted.filter((p) => now - p.born < 1600);
-  for (const p of planted) {
-    const age = (now - p.born) / 1600;
-    const fade = 1 - age;
-    for (let k = 0; k < 3; k++) {
-      const wave = Math.max(0, age - k * 0.1);
-      if (wave <= 0) continue;
-      ctx.strokeStyle = `rgba(255,255,255,${0.5 * (1 - wave) * fade})`;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 8 + easeOut(wave) * (70 + p.level * 30), 0, Math.PI * 2); ctx.stroke();
-    }
-  }
-}
-
-function drawParticles() {
-  const now = performance.now();
-  particles = particles.filter((p) => now - p.born < p.life);
-  for (const p of particles) {
-    const k = (now - p.born) / p.life;
-    p.vy += 0.32; p.vx *= 0.985;
-    p.x += p.vx; p.y += p.vy; p.angle += p.spin;
-    ctx.save();
-    ctx.translate(p.x, p.y); ctx.rotate(p.angle);
-    ctx.fillStyle = `rgba(255,255,255,${1 - k})`;
-    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
-    ctx.restore();
-  }
-}
-
-function easeOut(x) { return 1 - (1 - Math.min(1, Math.max(0, x))) ** 3; }
-
-function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]); }

@@ -60,7 +60,12 @@ The interface asks ahead of need, in the way [Spaceship](https://github.com/chua
 
 ```
 index.html, styles.css   the page
-src/app.js               the ring: selection, aiming, pins, drawing
+src/app.js               the writing surface: the passage, aiming, pins, asking, saving
+src/ring.js              the ring: its geometry, and everything drawn on the canvas
+src/shorten.js           shorter with the arrow keys
+src/panel.js             the documents panel
+src/key.js               the key dialog and the first-time choice
+src/dom.js               small page helpers
 src/landing.js           the front page: dot-matrix names, the falling title, the clips
 src/autopilot.js         the clips: a ghost cursor playing one interaction each
 src/documents.js         your reference documents, kept in the browser
