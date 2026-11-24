@@ -1,6 +1,0 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    { "name": "feeling", "runtimeExecutable": "npm", "runtimeArgs": ["start"], "port": 4317 }
-  ]
-}
