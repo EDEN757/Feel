@@ -447,7 +447,7 @@ function refreshPreview() {
 }
 
 function nearPin(x, y) {
-  return seg?.pins.find((p) => Math.hypot(p.x - x, p.y - y) < 14) ?? null;
+  return seg?.pins.find((p) => (p.kind !== "ref" || refsT < 0.5) && Math.hypot(p.x - x, p.y - y) < 14) ?? null;
 }
 
 addEventListener("mousemove", (e) => {
@@ -504,7 +504,6 @@ addEventListener("mousedown", (e) => {
           const r = el.getBoundingClientRect();
           return Math.max(24, Math.min(H - 24, r.top + Math.min(r.height / 2, 14)));
         } });
-      planted.push({ x: e.clientX, y: e.clientY, born: performance.now(), level: 1 });
       sound.plant(2);
     }
   } else {
@@ -1070,6 +1069,8 @@ function drawPins(time) {
   ctx.font = "400 10px 'IBM Plex Mono', monospace";
   ctx.textAlign = "center";
   for (const p of pins) {
+    // While the documents are open, the highlighted passage is the pin; the dot appears once the panel is away.
+    if (p.kind === "ref" && refsT >= 0.5) continue;
     const hovered = Math.hypot(p.x - mouse.x, p.y - mouse.y) < 14;
     const size = 5 + p.level * 2 + 0.8 * Math.sin(time * 2.4 + p.born);
     ctx.fillStyle = hovered ? "rgba(255,255,255,0.45)" : "#fff";
@@ -1078,7 +1079,7 @@ function drawPins(time) {
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.strokeRect(p.x - size, p.y - size, size * 2, size * 2);
     if (p.kind === "ref") {
-      if (refsT < 0.5) { ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillText(hovered ? "× remove" : p.doc.title, p.x - 12, p.y + 3); ctx.textAlign = "center"; }
+      ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillText(hovered ? "× remove" : p.doc.title, p.x - 12, p.y + 3); ctx.textAlign = "center";
       continue;
     }
     ctx.fillStyle = "rgba(255,255,255,0.55)";
