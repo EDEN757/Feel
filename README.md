@@ -4,7 +4,7 @@ See the change before you ask for it.
 
 ## Idea
 
-A UX research project on a new way for people and LLMs to work together, one that takes advantage of how fast models have become at answering.
+A research project on possible new interactions between humans and LLMs that take advantage of the growing response speed of models.
 
 You don't describe what you want. You see the versions of your text and choose a direction.
 
