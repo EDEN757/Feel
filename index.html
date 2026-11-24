@@ -28,7 +28,8 @@
   <div id="hero">
     <h1 aria-label="feel"><canvas data-word="feel" data-cell="7" data-fall></canvas></h1>
     <p>Feel the change in real time.</p>
-    <button id="heroStart">start writing <span aria-hidden="true">→</span></button>
+    <button id="heroStart">try it <span aria-hidden="true">→</span></button>
+    <p class="sub">Opens on a sample letter with pre-written answers. Switch the mode to live for a real model.</p>
     <a id="scrollCue" href="#clips">see how it works <span>↓</span></a>
     <footer>
       <a id="dotName" href="https://github.com/EDEN757" target="_blank" rel="noopener" aria-label="Made by Eden (Edoardo Schiatti), on GitHub"><span>made by</span><canvas data-word="eden" data-cell="4"></canvas></a>
@@ -65,29 +66,7 @@
     <p class="note">click a clip to move on</p>
   </div>
 
-  <div id="tour">
-    <h2>try the demo</h2>
-    <p class="sub">A sample letter with pre-written answers. No key needed.</p>
-    <ol id="steps">
-      <li data-step="select"><b>select</b> words, then move</li>
-      <li data-step="pin"><b>click</b> the ring to pin</li>
-      <li data-step="save"><b>↵</b> saves</li>
-      <li data-step="ask"><b>type</b> to ask for anything</li>
-      <li data-step="shorter"><b>←</b> makes it shorter</li>
-      <li data-step="write"><b>click</b> between words to write</li>
-    </ol>
-    <iframe id="demo" data-frame="?demo" title="feel, running on sample text"></iframe>
-  </div>
-
-  <div id="real">
-    <h2>start writing</h2>
-    <p class="sub">Your own text, answered by a real model. You bring a Cerebras API key; it stays in your browser.</p>
-    <menu id="begin">
-      <button id="startOwn">paste your own text <span aria-hidden="true">→</span></button>
-      <button id="startSample">start from a sample letter</button>
-    </menu>
-    <p id="small">feel is made for a mouse, a keyboard and a wide window.<br>Open it on a computer to try it.</p>
-  </div>
+  <p id="small">feel is made for a mouse, a keyboard and a wide window.<br>Open it on a computer to try it.</p>
 
   <footer id="foot">
     <span>feel · MIT license</span>
@@ -133,13 +112,18 @@
 
 <dialog id="keyDialog">
   <form method="dialog">
-    <h2 id="keyTitle">go live with Cerebras</h2>
-    <p>With your own Cerebras API key, a real model answers. Without one, feel runs on a simulator: canned replies that only fit the sample letter.</p>
-    <p>The key is stored only in this browser and sent only to api.cerebras.ai.</p>
-    <label>API key <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="csk-…" /></label>
-    <label>model <select id="modelInput"></select></label>
+    <h2>mode</h2>
+    <div id="modes">
+      <label><input type="radio" name="mode" value="demo" /><b>demo</b><span>Pre-written answers. They only fit the sample letter.</span></label>
+      <label><input type="radio" name="mode" value="live" /><b>live</b><span>A real model answers, on any text, with your own Cerebras key.</span></label>
+    </div>
+    <div id="liveFields" hidden>
+      <label>API key <input id="keyInput" type="password" autocomplete="off" spellcheck="false" placeholder="csk-…" /></label>
+      <label>model <select id="modelInput"></select></label>
+      <p id="keyNote">The key is stored only in this browser and sent only to api.cerebras.ai. Get one at <a href="https://cloud.cerebras.ai" target="_blank" rel="noopener">cloud.cerebras.ai</a>.</p>
+    </div>
     <menu>
-      <button value="remove" id="keyRemove">remove key</button>
+      <button value="remove" id="keyRemove">forget the key</button>
       <button value="cancel" id="keyCancel">cancel</button>
       <button value="save" id="keySave">save</button>
     </menu>

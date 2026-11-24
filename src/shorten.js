@@ -13,9 +13,9 @@ const COMBO_WINDOW = 320;
 
 /**
  * @param app what this needs from the app: passage() the open passage or null; text() and setText(next);
- *   renderText(); reload(passage) to fetch meanings for the new wording; notify(step); sound.
+ *   renderText(); reload(passage) to fetch meanings for the new wording; sound.
  */
-export function createShortener({ passage, text, setText, renderText, reload, notify, sound }) {
+export function createShortener({ passage, text, setText, renderText, reload, sound }) {
   const textEl = $("text"), meterEl = $("meter");
   const taps = { pending: 0, combo: 0, lastAt: 0, timer: null, busy: false };
   let meterTimer = null;
@@ -60,7 +60,6 @@ export function createShortener({ passage, text, setText, renderText, reload, no
         target.history.push({ text: before, rung: ladder.rung });
         ladder.rung = rung;
         await shatter(target, before, shorter);
-        notify("shorter");
       }
     } catch (error) { toast(error.message); }
     taps.busy = false;

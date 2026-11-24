@@ -1,5 +1,5 @@
 /**
- * The one door to the model. `request(kind, payload)` answers from the simulator until a Cerebras key is saved.
+ * The one door to the model. `request(kind, payload)` answers from the simulator in demo mode, and from Cerebras in live mode.
  *
  * Replies are remembered for the life of the page, keyed by the exact request. That is what makes it cheap to ask
  * ahead of time: a request made speculatively and the same request made for real share one call.
@@ -14,6 +14,7 @@ import { simulate } from "./simulator.js"
 
 const KEY_STORAGE = "feeling-cerebras-key"
 const MODEL_STORAGE = "feeling-cerebras-model"
+const MODE_STORAGE = "feeling-mode"
 const MAX_AT_ONCE = 4
 const RETRIES = 3
 const LONGEST_PAUSE_MS = 15000
@@ -33,15 +34,18 @@ export const settings = {
   onPause: null,
   get apiKey() { return read(KEY_STORAGE) },
   get model() { return read(MODEL_STORAGE) || DEFAULT_MODEL },
-  save({ apiKey, model }) {
+  /** The writer's choice of mode. A saved key can stay while they are back in demo mode. */
+  get live() { return !!this.apiKey && read(MODE_STORAGE) !== "demo" },
+  save({ apiKey, model, live = !!apiKey }) {
     write(KEY_STORAGE, apiKey.trim())
     write(MODEL_STORAGE, model.trim() === DEFAULT_MODEL ? "" : model.trim())
+    write(MODE_STORAGE, live ? "" : "demo")
     remembered.clear()
   },
 }
 
 export function isLive() {
-  return !!settings.apiKey && !settings.simulate
+  return settings.live && !settings.simulate
 }
 
 /**

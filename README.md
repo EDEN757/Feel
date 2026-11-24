@@ -23,20 +23,22 @@ You need [Node.js](https://nodejs.org) 18 or newer and git. There is nothing to 
 
 3. Open http://localhost:4317 in a desktop browser.
 
-The front page shows five short clips, one per interaction, each the real app playing itself on sample text. Below them is a demo on the same sample, with pre-written answers and no key. At the bottom, **paste your own text** or **start from a sample letter** opens the real editor.
+The front page shows five short clips, one per interaction, each the real app playing itself on sample text. **try it** opens the app on a sample letter in demo mode.
 
 To stop it, press Ctrl+C in the terminal. For another port, run `PORT=5000 npm start`.
 
 `npm start` only serves the files. There is no backend, so any static file server works too, for example `python3 -m http.server` in this folder. Opening `index.html` straight from disk does not work, because browsers only load JavaScript modules over http.
 
-### Using a real model
+### Demo and live
 
-Out of the box it runs on a **simulator** with canned rewrites, which is enough to try the interaction on the sample letter. For your own text you need a model:
+The app has two modes, shown in the top bar.
 
-1. Create an API key at [Cerebras](https://cloud.cerebras.ai).
-2. In the app, click **simulator · add key** in the top bar and paste it. Pick the model in the same dialog: `gpt-oss-120b` (the default) or `qwen-3.8-27b`.
+- **demo** is where it starts: pre-written answers that only fit the sample letter. It needs no key and is enough to try every interaction.
+- **live** sends your text to a real model. Click **mode: demo**, choose **live**, paste your own [Cerebras](https://cloud.cerebras.ai) API key and pick a model: `gpt-oss-120b` (the default) or `qwen-3.8-27b`.
 
-The key is stored only in your browser (localStorage) and sent only to `api.cerebras.ai`, straight from your browser. It never passes through a server of this project, because there is none. **remove key** in the same dialog deletes it. What the model is asked, word for word, is in [src/llm/prompts.js](src/llm/prompts.js).
+For your own text, click **edit text** and paste it in.
+
+The key is stored only in your browser (localStorage) and sent only to `api.cerebras.ai`, straight from your browser. It never passes through a server of this project, because there is none. **forget the key** in the same dialog deletes it. What the model is asked, word for word, is in [src/llm/prompts.js](src/llm/prompts.js).
 
 ## How it works
 
@@ -64,7 +66,7 @@ src/app.js               the writing surface: the passage, aiming, pins, asking,
 src/ring.js              the ring: its geometry, and everything drawn on the canvas
 src/shorten.js           shorter with the arrow keys
 src/panel.js             the documents panel
-src/key.js               the key dialog and the first-time choice
+src/key.js               the mode dialog: demo or live, key and model
 src/dom.js               small page helpers
 src/landing.js           the front page: dot-matrix names, the falling title, the clips
 src/autopilot.js         the clips: a ghost cursor playing one interaction each

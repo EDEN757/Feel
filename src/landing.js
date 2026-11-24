@@ -1,6 +1,6 @@
 /**
  * The front page: words drawn as dot-matrix displays that scatter from the cursor, the title that falls apart
- * as the page scrolls, the clips, and the tour's checklist.
+ * as the page scrolls, and the clips.
  */
 
 /** How far from the cursor dots are pushed, at most; small words use less. */
@@ -17,7 +17,6 @@ const GLYPHS = {
   N: ["10001", "11001", "10101", "10011", "10001", "10001", "10001"],
 }
 
-const steps = document.querySelector("#steps")
 const isDemo = new URLSearchParams(location.search).has("demo")
 
 if (!isDemo) {
@@ -43,11 +42,6 @@ function glideTo(target, ms = 1100) {
     if (t < 1) requestAnimationFrame(step)
   })
 }
-
-addEventListener("message", (event) => {
-  if (event.origin !== location.origin || typeof event.data?.feeling !== "string") return
-  steps?.querySelector(`[data-step="${CSS.escape(event.data.feeling)}"]`)?.classList.add("done")
-})
 
 /**
  * The clips sit in one line with a single clip in the spotlight, centred and at full strength; the rest are dimmed.

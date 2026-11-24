@@ -81,10 +81,18 @@ dialog { font: 400 13px/1.7 var(--mono); color: var(--fg); background: #050505; 
 dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
 dialog h2 { font: 500 13px var(--mono); margin: 0 0 12px; }
 dialog p { margin: 0 0 10px; color: var(--mid); }
-dialog label { display: grid; grid-template-columns: 8ch 1fr; align-items: baseline; margin-top: 12px; color: var(--mid); }
+#liveFields > label { display: grid; grid-template-columns: 8ch 1fr; align-items: baseline; margin-top: 12px; color: var(--mid); }
 dialog input { font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; }
 dialog input:focus, dialog select:focus { border-bottom-color: var(--fg); }
 dialog select { font: inherit; color: var(--fg); background: #050505; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; cursor: pointer; }
+#modes { display: grid; gap: 8px; margin: 4px 0 6px; }
+#modes label { display: grid; grid-template-columns: auto 6ch 1fr; gap: 0 10px; align-items: baseline; padding: 10px 12px; border: 1px solid #2a2a2a; cursor: pointer; color: var(--mid); }
+#modes label:has(input:checked) { border-color: var(--fg); color: var(--fg); }
+#modes input { accent-color: #fff; margin: 0; }
+#modes b { font-weight: 500; color: var(--fg); }
+#keyNote { margin: 14px 0 0; font-size: 12px; }
+#keyNote a { color: var(--fg); }
+#keyNote.missing { color: #ff8f73; }
 dialog menu { display: flex; justify-content: flex-end; gap: 22px; margin: 24px 0 0; padding: 0; }
 dialog menu button { color: var(--mid); }
 dialog menu button:hover, dialog menu button[value="save"] { color: var(--fg); }
@@ -110,15 +118,10 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #hero { position: relative; min-height: 66vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
 #hero h1 { font: 500 16px var(--mono); margin: 0; }
 #hero p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
-#real { display: grid; justify-items: center; gap: 14px; padding: 15vh 24px 17vh; text-align: center; }
-#real h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0; }
-#start .sub { margin: 0; font-size: 13px; color: var(--mid); max-width: 56ch; text-align: center; }
-#begin { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; margin: 14px 0 0; padding: 0; }
-#begin button, #heroStart { font-size: 16px; padding: 13px 28px; border: 1px solid var(--fg); transition: background .15s, color .15s; }
-#begin #startOwn, #begin button:hover, #heroStart { background: var(--fg); color: var(--bg); }
-#begin #startOwn:hover, #heroStart:hover { background: var(--bg); color: var(--fg); }
-#begin button:focus-visible, #heroStart:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
-#heroStart { margin-top: 22px; font-size: 15px; padding: 11px 26px; position: relative; z-index: 2; }
+#hero .sub { margin: 0; font-size: 13px; color: var(--mid); max-width: 56ch; text-align: center; }
+#heroStart { margin-top: 22px; font-size: 16px; padding: 12px 30px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); position: relative; z-index: 2; transition: background .15s, color .15s; }
+#heroStart:hover { background: var(--bg); color: var(--fg); }
+#heroStart:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
 #scrollCue { position: absolute; bottom: 74px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--mid); text-decoration: none; white-space: nowrap; }
 #scrollCue:hover { color: var(--fg); }
 #scrollCue span { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
@@ -129,15 +132,6 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #repoLink { color: var(--mid); text-decoration: none; }
 #repoLink:hover { color: var(--fg); }
 
-#tour { padding: 0 max(24px, 5vw) 12vh; display: grid; justify-items: center; gap: 18px; }
-#tour h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0 0 6px; }
-#steps { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 30px; margin: 0; padding: 0 24px; font-size: 15px; color: var(--mid); }
-#steps b { color: var(--fg); font-weight: 500; }
-#steps li::before { content: "□ "; }
-#steps li.done { color: #555; }
-#steps li.done::before { content: "■ "; color: var(--fg); }
-#steps li.done b { color: var(--mid); }
-#demo { width: min(1180px, 100%); height: min(760px, 86vh); border: 1px solid #2a2a2a; background: var(--bg); }
 
 body.demo #top, body.demo #refsTab { display: none; }
 html:has(body.clip) { overflow: hidden; }
@@ -145,7 +139,6 @@ html:has(body.demo) { scrollbar-width: none; }
 body.demo #text { padding: 11vh 0 0; }
 #top #home { margin: -5px 10px -5px -4px; vertical-align: middle; }
 #home canvas { display: block; }
-#begin button[hidden] { display: none; }
 #hero h1 { position: relative; line-height: 0; margin: 0 0 6px; }
 #hero h1 canvas { position: absolute; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 1; }
 #ghost { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border: 1.5px solid var(--fg); border-radius: 50%; z-index: 7; pointer-events: none; display: none; }
@@ -168,7 +161,6 @@ body.demo { font-size: 15px; }
 .clip iframe { border: 0; transform-origin: 0 0; pointer-events: none; display: block; }
 #clips figcaption { margin-top: 10px; font-size: 12px; color: var(--mid); }
 #clips figcaption b { color: var(--fg); font-weight: 500; margin-right: 1ch; }
-#demo { border: 1px solid #2a2a2a; }
 
 body.clip { font-size: 16px; }
 body.clip #hint { display: none; }
@@ -177,10 +169,6 @@ body.clip[data-clip="shorter"] #text { padding-top: 232px; }
 body.clip:not([data-clip="ask"]) #ask { display: none !important; }
 
 #clips figcaption { margin-top: 14px; font-size: 15px; }
-#tour { padding-left: 0; padding-right: 0; padding-bottom: 0; }
-#demo { width: 100%; height: 100vh; border: 0; border-top: 1px solid #2a2a2a; border-bottom: 1px solid #2a2a2a; }
-body.demo:not(.clip) { font-size: 16px; }
-body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
 
 #foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 28px; padding: 22px 24px 26px; border-top: 1px solid #1c1c1c; font-size: 12px; color: #666; }
 #foot nav { display: flex; flex-wrap: wrap; gap: 6px 24px; }
@@ -188,9 +176,9 @@ body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
 #foot a:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 4px; }
 
 /* Phones and narrow windows see the front page and its clips, but nothing that needs a mouse and keyboard. */
-#small { display: none; margin: 0; font-size: 14px; color: var(--mid); }
+#small { display: none; margin: 0; padding: 0 24px 14vh; text-align: center; font-size: 14px; color: var(--mid); }
 @media (max-width: 760px), (hover: none) and (pointer: coarse) {
-  body.home #real > :not(#small), body.home #tour, body.home #heroStart { display: none; }
+  body.home #heroStart, body.home #hero .sub { display: none; }
   body.home #top button:not(#home) { display: none; }
   body.home #small { display: block; }
 }

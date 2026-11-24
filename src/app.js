@@ -8,7 +8,7 @@ import { pilot, startAutopilot } from "./autopilot.js";
 import { diffWords } from "./diff.js";
 import { documents } from "./documents.js";
 import { $, span, toast } from "./dom.js";
-import { begin } from "./key.js";
+import "./key.js";
 import "./landing.js";
 import { isLive, request as api, settings } from "./llm/index.js";
 import { createPanel } from "./panel.js";
@@ -57,7 +57,7 @@ const panel = createPanel({
   },
 });
 const refsEl = panel.el;
-const shortener = createShortener({ passage: () => seg, text: () => text, setText, renderText, reload: loadSet, notify, sound });
+const shortener = createShortener({ passage: () => seg, text: () => text, setText, renderText, reload: loadSet, sound });
 
 render();
 requestAnimationFrame(frame);
@@ -86,11 +86,6 @@ function undo(back) {
   render();
 }
 
-/** Tells the front page what just happened, so its tour can tick the step off. */
-function notify(step) {
-  if (DEMO && !pilot.running) parent.postMessage({ feeling: step }, location.origin);
-}
-
 /** Keeps the text for the next visit. A passage still being shaped is not part of it until it is saved. */
 function remember() {
   if (DEMO || remember.last === text) return;
@@ -102,12 +97,12 @@ function render() {
   remember();
   if (!text && !document.body.classList.contains("editing")) home = true;
   document.body.classList.toggle("home", home);
-  $("heroStart").firstChild.textContent = text ? "back to your text " : "start writing ";
+  $("heroStart").firstChild.textContent = text ? "back to your text " : "try it ";
   renderText();
   statusEl.textContent = changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : "";
   document.body.classList.toggle("open", isOpen());
   const set = currentSet();
-  if (!seg || seg.done) hintEl.innerHTML = "<b>select</b> words to reshape them  ·  <b>click</b> between words to write there  ·  scroll to read";
+  if (!seg || seg.done) hintEl.innerHTML = `<b>select</b> words to reshape them  ·  <b>click</b> between words to write there  ·  scroll to read${isLive() || DEMO ? "" : "<br>demo mode: pre-written answers for the sample letter · <b>edit text</b> for your own · switch the <b>mode</b> to live for a real model"}`;
   else if (!set) hintEl.textContent = seg.mode === "write" ? "thinking about what could go here…" : "reading the passage…";
   else if (DEMO) hintEl.innerHTML = "<b>move</b> toward a meaning · <b>click</b> to pin · <b>↵</b> save · <b>type</b> to ask · <b>←</b> shorter · <b>esc</b> cancel";
   else {
@@ -185,10 +180,9 @@ function open(fields) {
   seg = { ...fields, current: fields.original, preview: null, sets: [], setIndex: 0, pins: [], history: [] };
   unfold();
   sound.wake();
-  notify(seg.mode === "write" ? "write" : "select");
   if (!isLive() && !DEMO && !SAMPLE.includes(text.slice(0, 60)) && !open.warned) {
     open.warned = true;
-    toast("simulator: it only knows the sample letter, so changes here are rough. Add a key for a real model.");
+    toast("demo mode: the answers only fit the sample letter, so changes here are rough. Switch the mode to live for a real model.");
   }
   if (seg.mode === "edit") shortener.prepare(seg);
   render();
@@ -359,7 +353,6 @@ async function askFor(query, apply = true) {
     const asked = { ...contextOf(target), mode: target.prompt ? "edit" : target.mode, prompt: query, keep, refs: refsOf(target.pins), library: documents.all.map((d) => ({ title: d.title, text: d.paragraphs.join(" ") })), count: MEANINGS, apply };
     const { text: result, directions } = await api("prompt", asked);
     if (seg !== target) return;
-    notify("ask");
     if (!apply) {
       target.sets.push(directions.map((d) => ({ ...d, kind: d.kept ? "kept" : "suggested", basis: basisOf(target) })));
       target.setIndex = target.sets.length - 1;
@@ -479,7 +472,6 @@ addEventListener("mousedown", (e) => {
       get y() { return ellipsePoint(this.q, this.deg)[1]; } });
     plant(e.clientX, e.clientY, a.level);
     sound.plant(a.level);
-    notify("pin");
   }
   render();
   refreshPreview();
@@ -491,7 +483,6 @@ async function save() {
   if (!pulls.length && !target.prompt) return toast(target.mode === "write" ? "pin a move, point at one, or type what you want" : "pin a meaning, point at one, or type what you want");
   fold(currentSet(), target.pins.map((p) => ({ x: p.x, y: p.y })));
   sound.save(pulls.length);
-  notify("save");
   target.preview = null;
   const instant = !pulls.length || (pulls.length === 1 && pulls[0].kind === "meaning" && !pulls[0].partner && pulls[0].dir.basis === basisOf(target));
   if (!instant) { target.waiting = true; finish(target, false); }
@@ -599,10 +590,12 @@ $("home").addEventListener("click", () => {
   render();
   scrollTo(0, 0);
 });
-$("startOwn").addEventListener("click", () => begin(() => setEditing(true)));
-/** The button on the first screen: straight to the editor, or back to the text when there already is one. */
-$("heroStart").addEventListener("click", () => (text ? leaveHome() : begin(() => setEditing(true))));
-$("startSample").addEventListener("click", () => begin(() => { setText(SAMPLE); leaveHome(); }));
+/** The button on the first screen: opens on the sample letter, or goes back to the text when there already is one. */
+$("heroStart").addEventListener("click", () => {
+  if (!text) setText(SAMPLE);
+  leaveHome();
+});
+addEventListener("feel:mode", render);
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(text); toast("copied"); } catch { toast("could not copy: select the text and copy it by hand"); }
 });
