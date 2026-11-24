@@ -32,7 +32,7 @@ Enter saves, Esc cancels, Cmd+Z undoes, and scrolling gives new meanings.
 
 ## Speed
 
-It runs on [Cerebras](https://cloud.cerebras.ai), one of the few providers already serving models at this speed. The interface also asks ahead of need, as [Spaceship](https://github.com/chuanqisun/spaceship) does, so the answer is usually there when the cursor arrives.
+It runs on [Cerebras](https://cloud.cerebras.ai), one of the few providers already serving models at this speed.
 
 ## Run it locally
 
