@@ -100,9 +100,11 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #hero { position: relative; min-height: 88vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
 #hero h1 { font: 500 16px var(--mono); margin: 0; }
 #hero p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
-#hero menu { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 28px; margin: 18px 0 0; padding: 0; }
-#hero menu button { border-bottom: 1px solid var(--mid); padding: 2px 0; }
-#hero menu button:hover { border-bottom-color: var(--fg); }
+#begin { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; margin: 0 0 16vh; padding: 0 24px; }
+#begin button { font-size: 16px; padding: 13px 28px; border: 1px solid var(--fg); transition: background .15s, color .15s; }
+#begin #startOwn, #begin button:hover { background: var(--fg); color: var(--bg); }
+#begin #startOwn:hover { background: var(--bg); color: var(--fg); }
+#begin button:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
 #scrollCue { position: absolute; bottom: 74px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--mid); text-decoration: none; white-space: nowrap; }
 #scrollCue:hover { color: var(--fg); }
 #scrollCue span { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
@@ -130,7 +132,7 @@ html:has(body.demo) { scrollbar-width: none; }
 body.demo #text { padding: 11vh 0 0; }
 #top #home { margin: -5px 10px -5px -4px; vertical-align: middle; }
 #home canvas { display: block; }
-#hero menu button[hidden] { display: none; }
+#begin button[hidden] { display: none; }
 #hero h1 { position: relative; line-height: 0; margin: 0 0 6px; }
 #hero h1 canvas { position: absolute; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none; z-index: 1; }
 #ghost { position: fixed; left: -7px; top: -7px; width: 14px; height: 14px; border: 1.5px solid var(--fg); border-radius: 50%; z-index: 7; pointer-events: none; display: none; }
@@ -139,7 +141,7 @@ body.demo #text { padding: 11vh 0 0; }
 body.demo { font-size: 15px; }
 #repoLink { display: block; line-height: 0; }
 
-#clips { padding: 0 max(24px, 5vw) 14vh; display: grid; justify-items: center; gap: 22px; }
+#clips { padding: 0 max(24px, 5vw) 7vh; display: grid; justify-items: center; gap: 22px; }
 #clips h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0 0 6px; }
 #clips { padding-left: 0; padding-right: 0; grid-template-columns: minmax(0, 1fr); }
 #clips .rail { width: 100%; overflow: hidden; }
