@@ -1,8 +1,16 @@
 # feel
 
-See the change before you ask for it.
+Feel the change in real time.
+
+## Demo
+
+Try it at [eden757.github.io/Feel](https://eden757.github.io/Feel/). It opens on a sample letter with pre-written answers. Switch the mode to live to use a real model on your own text, with your own [Cerebras](https://cloud.cerebras.ai) API key.
+
+The app stores your key in your browser's local storage and sends it only to Cerebras, directly from your browser. There is no server in between. Use it at your own risk: prefer a key with a spending limit, and remove it with "forget the key" when you are done.
 
 ## Idea
+
+Typing a query is not the most elegant way for a person to work with an LLM. This is a step toward something better.
 
 A research project on possible new interactions between humans and LLMs that take advantage of the growing response speed of models.
 
@@ -39,14 +47,14 @@ It runs on [Cerebras](https://cloud.cerebras.ai), one of the few providers alrea
 You need [Node.js](https://nodejs.org) 18 or newer. There is nothing to install.
 
 ```bash
-git clone https://github.com/EDEN757/feel.git
-cd feel
+git clone https://github.com/EDEN757/Feel.git
+cd Feel
 npm start
 ```
 
 Open http://localhost:4317 in a desktop browser.
 
-It starts in **demo** mode: pre-written answers that only fit the sample letter. For a real model on your own text, click **mode: demo**, choose **live**, and paste your own Cerebras API key. The key stays in your browser and is sent only to Cerebras.
+It works the same as the demo above: pre-written answers first, live with your own key.
 
 ## Layout
 
@@ -79,4 +87,4 @@ tests/                   run with `npm test`
 
 Made by [Edoardo Schiatti](https://github.com/EDEN757).
 
-Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun, and by my need to write better cover letters.
+Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun, which is well worth a look, and by my need to write better cover letters.
