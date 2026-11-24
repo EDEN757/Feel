@@ -22,7 +22,13 @@ export async function complete({ apiKey, model, system, user, schema }) {
     }),
   })
 
-  if (!response.ok) throw new Error(await problemOf(response))
+  if (!response.ok) {
+    const error = new Error(await problemOf(response))
+    error.status = response.status
+    const seconds = Number(response.headers.get("retry-after"))
+    if (seconds > 0) error.retryAfter = seconds * 1000
+    throw error
+  }
   const content = (await response.json()).choices?.[0]?.message?.content
   try {
     return JSON.parse(content)

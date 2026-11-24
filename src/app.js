@@ -33,7 +33,9 @@ if (CLIP) { document.body.classList.add("clip"); document.body.dataset.clip = CL
 let text = DEMO ? DEMO_TEXT : stored();
 const undone = { past: [], future: [] };
 /** The front page shows when there is no text yet, or when the name in the corner is clicked. */
-let home = !text;
+/** Phones and narrow windows stay on the front page: the editor needs a mouse, a keyboard and room for the ring. */
+const SMALL = !DEMO && matchMedia("(max-width: 760px), (hover: none) and (pointer: coarse)").matches;
+let home = !text || SMALL;
 let seg = null;
 let changes = 0;
 let mouse = { x: -1, y: -1 };
@@ -210,7 +212,7 @@ function open(fields) {
     open.warned = true;
     toast("simulator: it only knows the sample letter, so changes here are rough. Add a key for a real model.");
   }
-  if (seg.mode === "edit") ahead(ladderOf(seg).versions);
+  if (seg.mode === "edit") ahead(ladderOf(seg, true).versions);
   render();
   centerOn(textEl.querySelector(".seg, .ghost"));
   loadSet(seg);
@@ -259,7 +261,7 @@ async function loadSet(target) {
     target.setIndex = target.sets.length - 1;
     labelT = 0;
     glow = [];
-    ahead(api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: target.sets.flat().map((d) => d.label) }));
+    ahead(api(route, { text, start: target.start, end: target.end, count: MEANINGS, exclude: target.sets.flat().map((d) => d.label) }, { ahead: true }));
   } catch (error) {
     toast(error.message);
     if (!target.sets.length && seg === target) seg = null;
@@ -574,8 +576,9 @@ function shrinkKey(direction) {
 }
 
 /** Five shorter versions of the passage, asked for when it is selected so the arrows answer at once. */
-function ladderOf(target) {
-  target.ladder ??= { rung: 0, versions: api("shrinks", { text, start: target.start, end: target.end }).then((reply) => reply.versions) };
+function ladderOf(target, early = false) {
+  target.ladder ??= { rung: 0, passage: { text, start: target.start, end: target.end } };
+  target.ladder.versions = api("shrinks", target.ladder.passage, { ahead: early }).then((reply) => reply.versions);
   return target.ladder;
 }
 
@@ -811,6 +814,8 @@ keyDialog.addEventListener("close", () => {
   action();
 });
 renderLive();
+settings.onPause = (ms) => toast(`rate limit reached: trying again in ${Math.ceil(ms / 1000)}s`);
+
 function renderLive() { $("live").textContent = isLive() ? `live · ${settings.model}` : "simulator · add key"; }
 
 $("sound").addEventListener("click", () => { sound.toggle(); renderSound(); });
@@ -893,7 +898,13 @@ function closeDocForm() { docForm.reset(); docForm.hidden = true; $("docAdd").hi
 
 function frame(t) {
   requestAnimationFrame(frame);
-  document.body.classList.toggle("typing", isOpen() && !!askInput.value);
+  const typing = isOpen() && !!askInput.value;
+  document.body.classList.toggle("typing", typing);
+  // The ask bar grows with what is typed. Measured every frame while typing, because its text size is animated.
+  if (typing || askInput.style.height) {
+    askInput.style.height = "";
+    if (typing) askInput.style.height = `${askInput.scrollHeight}px`;
+  }
   try { draw(t); } catch (error) { console.error(error); }
 }
 

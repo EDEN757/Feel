@@ -121,10 +121,13 @@ function drawWord(canvas) {
   })
 
   const size = cell * 0.72
+  /** The line under a falling word fades as the dots start down, so they do not rain through it. */
+  const below = falls ? canvas.closest("#hero")?.querySelector("p") : null
   requestAnimationFrame(function frame(t) {
     requestAnimationFrame(frame)
     if (!canvas.offsetParent) return
     const scrolled = falls ? Math.min(1, scrollY / (innerHeight * 0.5)) : 0
+    if (below) below.style.opacity = Math.max(0, 1 - scrolled * 5)
     ctx.clearRect(0, 0, width, height)
     for (const dot of dots) {
       if (mouse) {

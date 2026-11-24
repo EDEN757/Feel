@@ -57,7 +57,7 @@ body.open #ask { display: flex; }
 #ask, #screen, #text, #hint { transition: bottom .35s cubic-bezier(.2, .8, .2, 1), transform .35s cubic-bezier(.2, .8, .2, 1), width .35s cubic-bezier(.2, .8, .2, 1), font-size .35s cubic-bezier(.2, .8, .2, 1), opacity .35s; }
 body.typing #ask { bottom: 50%; transform: translate(-50%, 50%); width: min(920px, 86vw); font-size: 26px; }
 body.typing #screen, body.typing #text, body.typing #hint, body.typing #refs { opacity: .14; }
-#askInput { flex: 1; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; caret-color: var(--fg); }
+#askInput { flex: 1; resize: none; overflow: hidden; height: 1.5em; line-height: 1.4; font: inherit; color: var(--fg); background: none; border: none; border-bottom: 1px solid #444; outline: none; padding: 2px 0; caret-color: var(--fg); }
 #askInput:focus { border-bottom-color: var(--fg); }
 #askInput::placeholder { color: #666; }
 #asked { display: none; font-size: 12px; color: var(--bg); background: var(--fg); padding: 0 6px; cursor: pointer; white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
@@ -169,3 +169,11 @@ body.clip:not([data-clip="ask"]) #ask { display: none !important; }
 #demo { width: 100%; height: 100vh; border: 0; border-top: 1px solid #2a2a2a; border-bottom: 1px solid #2a2a2a; }
 body.demo:not(.clip) { font-size: 16px; }
 body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
+
+/* Phones and narrow windows see the front page and its clips, but nothing that needs a mouse and keyboard. */
+#small { display: none; margin: 0; padding: 0 24px 16vh; text-align: center; font-size: 14px; color: var(--mid); }
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  body.home #begin, body.home #tour { display: none; }
+  body.home #top button:not(#home) { display: none; }
+  body.home #small { display: block; }
+}
