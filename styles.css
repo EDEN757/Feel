@@ -166,10 +166,15 @@ body.clip:not([data-clip="ask"]) #ask { display: none !important; }
 
 #clips figcaption { margin-top: 14px; font-size: 15px; }
 #tour { padding-left: 0; padding-right: 0; padding-bottom: 0; }
-#tour .note { padding: 14px 24px 22px; }
+#tour .note { padding: 16px 24px 44px; color: var(--mid); }
 #demo { width: 100%; height: 100vh; border: 0; border-top: 1px solid #2a2a2a; border-bottom: 1px solid #2a2a2a; }
 body.demo:not(.clip) { font-size: 16px; }
 body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
+
+#foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 28px; padding: 22px 24px 26px; border-top: 1px solid #1c1c1c; font-size: 12px; color: #666; }
+#foot nav { display: flex; flex-wrap: wrap; gap: 6px 24px; }
+#foot a { color: var(--mid); text-decoration: none; }
+#foot a:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 4px; }
 
 /* Phones and narrow windows see the front page and its clips, but nothing that needs a mouse and keyboard. */
 #small { display: none; margin: 0; padding: 0 24px 16vh; text-align: center; font-size: 14px; color: var(--mid); }
