@@ -97,7 +97,6 @@ function render() {
   remember();
   if (!text && !document.body.classList.contains("editing")) home = true;
   document.body.classList.toggle("home", home);
-  $("heroStart").firstChild.textContent = text ? "back to your text " : "try it ";
   renderText();
   statusEl.textContent = changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : "";
   document.body.classList.toggle("open", isOpen());
@@ -590,7 +589,7 @@ $("home").addEventListener("click", () => {
   render();
   scrollTo(0, 0);
 });
-/** The button on the first screen: opens on the sample letter, or goes back to the text when there already is one. */
+/** The button on the first screen: opens the app on the sample letter, or on the text from last time if there is one. */
 $("heroStart").addEventListener("click", () => {
   if (!text) setText(SAMPLE);
   leaveHome();
