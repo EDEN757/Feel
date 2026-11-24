@@ -114,10 +114,11 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #real h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0; }
 #start .sub { margin: 0; font-size: 13px; color: var(--mid); max-width: 56ch; text-align: center; }
 #begin { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; margin: 14px 0 0; padding: 0; }
-#begin button { font-size: 16px; padding: 13px 28px; border: 1px solid var(--fg); transition: background .15s, color .15s; }
-#begin #startOwn, #begin button:hover { background: var(--fg); color: var(--bg); }
-#begin #startOwn:hover { background: var(--bg); color: var(--fg); }
-#begin button:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+#begin button, #heroStart { font-size: 16px; padding: 13px 28px; border: 1px solid var(--fg); transition: background .15s, color .15s; }
+#begin #startOwn, #begin button:hover, #heroStart { background: var(--fg); color: var(--bg); }
+#begin #startOwn:hover, #heroStart:hover { background: var(--bg); color: var(--fg); }
+#begin button:focus-visible, #heroStart:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+#heroStart { margin-top: 22px; font-size: 15px; padding: 11px 26px; position: relative; z-index: 2; }
 #scrollCue { position: absolute; bottom: 74px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--mid); text-decoration: none; white-space: nowrap; }
 #scrollCue:hover { color: var(--fg); }
 #scrollCue span { display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
@@ -189,7 +190,7 @@ body.demo:not(.clip) #text { padding: 19vh 0 45vh; }
 /* Phones and narrow windows see the front page and its clips, but nothing that needs a mouse and keyboard. */
 #small { display: none; margin: 0; font-size: 14px; color: var(--mid); }
 @media (max-width: 760px), (hover: none) and (pointer: coarse) {
-  body.home #real > :not(#small), body.home #tour { display: none; }
+  body.home #real > :not(#small), body.home #tour, body.home #heroStart { display: none; }
   body.home #top button:not(#home) { display: none; }
   body.home #small { display: block; }
 }

@@ -102,6 +102,7 @@ function render() {
   remember();
   if (!text && !document.body.classList.contains("editing")) home = true;
   document.body.classList.toggle("home", home);
+  $("heroStart").firstChild.textContent = text ? "back to your text " : "start writing ";
   renderText();
   statusEl.textContent = changes ? `  ·  ${changes} change${changes > 1 ? "s" : ""}` : "";
   document.body.classList.toggle("open", isOpen());
@@ -599,6 +600,8 @@ $("home").addEventListener("click", () => {
   scrollTo(0, 0);
 });
 $("startOwn").addEventListener("click", () => begin(() => setEditing(true)));
+/** The button on the first screen: straight to the editor, or back to the text when there already is one. */
+$("heroStart").addEventListener("click", () => (text ? leaveHome() : begin(() => setEditing(true))));
 $("startSample").addEventListener("click", () => begin(() => { setText(SAMPLE); leaveHome(); }));
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(text); toast("copied"); } catch { toast("could not copy: select the text and copy it by hand"); }
