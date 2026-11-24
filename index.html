@@ -96,7 +96,14 @@
 </section>
 
 <main id="text"></main>
-<textarea id="editor" spellcheck="false" aria-label="Your text" placeholder="paste or type your text, then press done (top right)"></textarea>
+<div id="write">
+  <textarea id="editor" spellcheck="false" aria-label="Your text" placeholder="paste or type your text here"></textarea>
+  <menu>
+    <span>⌘↵ also works</span>
+    <button id="editCancel">cancel</button>
+    <button id="editDone">done <span aria-hidden="true">→</span></button>
+  </menu>
+</div>
 
 <aside id="refs">
   <header><h2>your documents</h2><button id="refsClose" title="close">×</button></header>

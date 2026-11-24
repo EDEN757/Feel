@@ -587,6 +587,10 @@ function leaveHome() {
 }
 
 $("edit").addEventListener("click", () => setEditing(!document.body.classList.contains("editing")));
+$("editDone").addEventListener("click", () => setEditing(false));
+/** Cancel leaves the text as it was before the editor opened. */
+$("editCancel").addEventListener("click", () => { $("editor").value = text; setEditing(false); });
+$("editor").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setEditing(false); } });
 $("home").addEventListener("click", () => {
   if (document.body.classList.contains("editing")) setEditing(false);
   forget();
