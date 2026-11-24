@@ -23,6 +23,8 @@ let glow = [], flashes = [], planted = [], particles = [], trail = [];
 let collapse = null;
 /** When the current wait began, and how visible its waves are (0 to 1). */
 let waitingSince = 0, waitT = 0;
+/** How far the cursor has opened into its frame for something pressable (0 to 1). */
+let pressT = 0;
 /** A wait shorter than this shows nothing: most answers are already there. */
 const PATIENCE_MS = 350;
 /** What the app is showing this frame: { open, set, aim, pins, mouse, names, panel, cursor, onPin, busy }. */
@@ -272,9 +274,23 @@ function drawCursor() {
     ctx.beginPath(); ctx.moveTo(ix, iy); ctx.lineTo(view.mouse.x, view.mouse.y); ctx.stroke();
     ctx.setLineDash([]);
   }
-  const size = 5 + level * 2;
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(view.mouse.x - size / 2, view.mouse.y - size / 2, size, size);
+  // Over something pressable the square opens into a frame around a dot; otherwise it is solid and grows with the strength.
+  pressT += ((view.mouse.pressable && !level ? 1 : 0) - pressT) * 0.3;
+  const size = 5 + level * 2 + 11 * pressT;
+  const { x, y } = view.mouse;
+  // A dark edge under the white keeps the cursor visible on white: a filled button, a highlighted passage.
+  ctx.fillStyle = "#000";
+  if (pressT < 0.05) {
+    ctx.fillRect(x - size / 2 - 1, y - size / 2 - 1, size + 2, size + 2);
+    ctx.fillStyle = "#fff";
+    return ctx.fillRect(x - size / 2, y - size / 2, size, size);
+  }
+  ctx.strokeStyle = "#000"; ctx.lineWidth = 3.5;
+  ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+  ctx.fillRect(x - 2.5, y - 2.5, 5, 5);
+  ctx.strokeStyle = ctx.fillStyle = "#fff"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+  ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
 }
 
 /** A bond between two points: bright at both ends, fading to nothing in the middle so it never covers the text. */

@@ -409,8 +409,11 @@ function nearPin(x, y) {
 
 document.addEventListener("mouseleave", () => { mouse = { x: -1, y: -1 }; });
 
+/** Things the cursor can press. Over them it opens into a frame, the way a system cursor turns into a hand. */
+const PRESSABLE = "a, button, select, input, label, #clips figure, #asked";
+
 addEventListener("mousemove", (e) => {
-  mouse = { x: e.clientX, y: e.clientY };
+  mouse = { x: e.clientX, y: e.clientY, pressable: !!e.target.closest?.(PRESSABLE) };
   trace(mouse.x, mouse.y);
   if (isOpen()) {
     const wantPanel = mouse.x > W - EDGE || (refsEl.classList.contains("show") && mouse.x > W - PANEL - 40) || refsEl.contains(document.activeElement);
