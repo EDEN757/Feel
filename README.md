@@ -93,4 +93,4 @@ A prototype. Your text and documents are kept in your browser. The prompts are s
 
 Made by [Edoardo Schiatti](https://github.com/EDEN757).
 
-Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun, which showed what realtime steering of text could feel like.
+Inspired by [Spaceship IDE](https://github.com/chuanqisun/spaceship) by Chuanqi Sun.
