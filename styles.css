@@ -97,7 +97,7 @@ dialog menu button:hover, dialog menu button[value="save"] { color: var(--fg); }
 body.home:not(.editing) #start { display: block; }
 body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy { display: none; }
 
-#hero { position: relative; min-height: 88vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
+#hero { position: relative; min-height: 66vh; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 0 8vw; }
 #hero h1 { font: 500 16px var(--mono); margin: 0; }
 #hero p { margin: 0; color: var(--mid); font-size: 13px; max-width: 46ch; }
 #begin { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 18px; margin: 0 0 16vh; padding: 0 24px; }
