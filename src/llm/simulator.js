@@ -17,7 +17,13 @@ const ROUTES = {
   },
   shrinks: ({ text, start, end }) => {
     const passage = text.slice(start, end), words = passage.split(/\s+/).filter(Boolean).length
-    return { versions: Array.from({ length: SHRINK_RUNGS }, (_, k) => mockShrink(passage, Math.max(3, Math.round(words * 0.85 ** (k + 1))))) }
+    if (SHRUNK[passage]) return { versions: SHRUNK[passage] }
+    let last = passage
+    return { versions: Array.from({ length: SHRINK_RUNGS }, (_, k) => {
+      const target = Math.max(3, Math.round(words * 0.85 ** (k + 1)))
+      const shorter = mockShrink(passage, target)
+      return (last = shorter.length < last.length ? shorter : firstWords(last, target))
+    }) }
   },
   prompt: ({ mode, text, start, end, prompt, keep = [], refs = [], count = 6, apply = true }) =>
     apply ? mockPrompt(mode, text.slice(start, end), prompt, keep, refs, count) : mockSteer(mode, text.slice(start, end), prompt, keep, count),
@@ -179,6 +185,22 @@ function mockCompose(mode, passage, pulls, refs) {
 const FILLER = /\b(really|very|just|actually|quite|simply|small|every day|at a university lab|messy)\s+/gi
 
 /** Shortens like a careful editor would: filler first, then side clauses, then whole trailing sentences. */
+/** Hand-written ladders for passages of the sample letter, so each tap of the arrow visibly cuts something. */
+const SHRUNK = {
+  "I would sit with them, listen until I understood what they were really asking, and then turn it into something they could use every day: a dashboard, a cleaning script, a small app.": [
+    "I would sit with them, listen until I understood what they were really asking, and turn it into something they could use every day: a dashboard, a script, an app.",
+    "I would sit with them, listen until I understood the real question, and turn it into something they could use every day.",
+    "I would listen until I understood the real question, then turn it into something they could use every day.",
+    "I would listen until I understood the real question, then build something they could use.",
+    "I listened for the real question, then built something useful.",
+  ],
+}
+
+function firstWords(text, count) {
+  const words = text.split(/\s+/).filter(Boolean)
+  return words.slice(0, Math.max(1, Math.min(count, words.length - 1))).join(" ").replace(/[,;:.]?$/, ".")
+}
+
 function mockShrink(passage, target) {
   const count = (t) => t.split(/\s+/).filter(Boolean).length
   let text = passage.replace(FILLER, "")

@@ -5,7 +5,8 @@
 
 /** How far from the cursor dots are pushed, at most; small words use less. */
 const REACH = 34
-const CLIP_WIDTH = 840, CLIP_HEIGHT = 500
+/** A clip is drawn at the size of a real window, so the text and the ring keep the app's own proportions. */
+const CLIP_WIDTH = 1200, CLIP_HEIGHT = 714
 
 /** A 5×7 dot-matrix face, only the letters the page shows. */
 const GLYPHS = {

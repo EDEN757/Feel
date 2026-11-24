@@ -21,18 +21,8 @@ const CLIPS = {
   async change(it) {
     await it.select(FIRST)
     for (const level of [1, 2, 3]) { await it.toRing(1, level, 650); await it.wait(800) }
-    await it.toRing(0, 2, 900)
-    await it.wait(900)
-    await it.toRing(4, 3, 1000)
-    await it.wait(1000)
-    it.press("Enter")
-    await it.wait(2600)
-  },
-
-  async combine(it) {
-    await it.open(FIRST)
-    await it.toRing(0, 2, 800, 0.35)
-    await it.wait(300)
+    await it.toRing(0, 2, 900, 0.35)
+    await it.wait(700)
     it.click()
     await it.wait(700)
     await it.toRing(2, 3, 1000, 0.7)
@@ -64,10 +54,9 @@ const CLIPS = {
 
   async shorter(it) {
     await it.open(LONG)
-    await it.wait(500)
-    for (let i = 0; i < 3; i++) { it.press("ArrowLeft"); await it.wait(1500) }
-    it.press("ArrowRight")
-    await it.wait(1400)
+    await it.wait(300)
+    for (const key of ["ArrowLeft", "ArrowLeft", "ArrowLeft", "ArrowRight", "ArrowRight", "ArrowRight", "ArrowLeft", "ArrowLeft"]) { it.press(key); await it.wait(440) }
+    await it.wait(900)
     it.press("Escape")
     await it.wait(1200)
   },
@@ -75,8 +64,10 @@ const CLIPS = {
   async documents(it) {
     await it.open(FIRST)
     await it.moveTo(innerWidth - 4, innerHeight / 2, 900)
-    await it.wait(700)
-    const passage = document.querySelectorAll("#refs .doc p")[3].getBoundingClientRect()
+    const box = () => document.querySelectorAll("#refs .doc p")[3].getBoundingClientRect()
+    while (box().right > innerWidth) await it.wait(60)
+    await it.wait(400)
+    const passage = box()
     await it.moveTo(passage.left + 60, passage.top + passage.height / 2, 700)
     await it.wait(400)
     it.click()

@@ -23,7 +23,7 @@ You need [Node.js](https://nodejs.org) 18 or newer and git. There is nothing to 
 
 3. Open http://localhost:4317 in a desktop browser.
 
-The front page shows six short clips, one per interaction, each the real app playing itself on sample text. Below them is the same sample to try by hand. Click **paste your own text** or **try a sample letter** to start writing.
+The front page shows five short clips, one per interaction, each the real app playing itself on sample text. Below them is the same sample to try by hand. Click **paste your own text** or **try a sample letter** to start writing.
 
 To stop it, press Ctrl+C in the terminal. For another port, run `PORT=5000 npm start`.
 
