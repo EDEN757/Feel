@@ -114,15 +114,15 @@ body.home #text, body.home #hint, body.home:not(.editing) #edit, body.home #copy
 #repoLink:hover { color: var(--fg); }
 
 #tour { padding: 0 max(24px, 5vw) 12vh; display: grid; justify-items: center; gap: 18px; }
-#tour h2 { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mid); margin: 0; }
-#steps { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 26px; margin: 0; padding: 0; font-size: 12px; color: var(--mid); }
+#tour h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0 0 6px; }
+#steps { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 30px; margin: 0; padding: 0 24px; font-size: 15px; color: var(--mid); }
 #steps b { color: var(--fg); font-weight: 500; }
 #steps li::before { content: "□ "; }
 #steps li.done { color: #555; }
 #steps li.done::before { content: "■ "; color: var(--fg); }
 #steps li.done b { color: var(--mid); }
 #demo { width: min(1180px, 100%); height: min(760px, 86vh); border: 1px solid #2a2a2a; background: var(--bg); }
-#tour .note { margin: 0; font-size: 12px; color: #666; text-align: center; }
+#tour .note { margin: 0; font-size: 13px; color: #666; text-align: center; }
 
 body.demo #top, body.demo #refsTab { display: none; }
 html:has(body.clip) { overflow: hidden; }
@@ -140,7 +140,7 @@ body.demo { font-size: 15px; }
 #repoLink { display: block; line-height: 0; }
 
 #clips { padding: 0 max(24px, 5vw) 14vh; display: grid; justify-items: center; gap: 22px; }
-#clips h2 { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mid); margin: 0; }
+#clips h2 { font: 500 26px var(--mono); color: var(--fg); margin: 0 0 6px; }
 #clips { padding-left: 0; padding-right: 0; grid-template-columns: minmax(0, 1fr); }
 #clips .rail { width: 100%; overflow: hidden; }
 #clips .track { position: relative; display: flex; gap: 36px; width: max-content; transition: transform .9s cubic-bezier(.2,.7,.1,1); }
